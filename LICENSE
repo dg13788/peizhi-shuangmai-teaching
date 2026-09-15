@@ -1,0 +1,57 @@
+MIT License
+
+Copyright (c) 2026 Xd_香墩
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+附加条款（Additional Terms，不可移除，与上述 MIT License 共同构成许可条件）
+
+本附加条款为 SKILL.md 第 3.1 节"开源授权、引用与隐私边界协议"的正式文本化，
+任何使用、复制、修改、分发本软件及其文档的行为均视为接受以下条款：
+
+1. 红区护栏不可移除条款（最高优先）
+   禁止移除、弱化或以任何方式绕过"红区零输入"护栏（见 SKILL.md §2 第 1/9 条、
+   §3.3、环节 0.5）。任何衍生版本必须完整保留该护栏声明及其效力，
+   不得通过修改提示词、截断文档、改写机制等方式使其失效。
+
+2. 署名保留条款
+   允许自由使用、修改、再分发，但衍生作品须保留作者署名（Xd_香墩）
+   与原始版权声明，包括本 LICENSE 文件本身。
+
+3. 商业用途限制条款
+   将本软件或其衍生作品用于商业培训、付费课程或商业化产品的，
+   须事先取得作者书面授权；或对文档/模板部分采用更保守的
+   CC BY-NC-SA（署名-非商业性使用-相同方式共享）许可替代。
+   本条款为许可的附加组成部分，不因 MIT 主许可的授权范围而失效。
+
+4. 隐私与责任边界
+   使用者承诺遵守 SKILL.md §3.3 数据与隐私边界协议：
+   （1）红区零输入：不得将学生真实姓名、身份证号、病历、照片、
+   家庭敏感结构输入本软件，亦不得通过上传附件绕过护栏；
+   （2）输出即脱敏：任何交付物不得含真实个人身份信息，一律代号；
+   （3）因使用者违反上述承诺导致的任何责任，由使用者自行承担，
+   与本软件作者无关；
+   （4）本软件为教学辅助工具，不构成医疗/康复建议，不承诺疗效。
+
+5. 方法论文献声明
+   本软件融合的公开方法论（培智课标、UbD、BOPPPS、LOS 连续体、PBS 等）
+   均为理念层面的借鉴，本软件不包含上述文献原文；发布本软件不构成
+   对上述文献的转载，使用者与衍生者应保留 SKILL.md §3.2 引用清单。

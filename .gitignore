@@ -1,0 +1,43 @@
+# —— 培智·双脉教学引擎 · Git 忽略规则 ——
+# 依据 SKILL.md §9（示例与回归测试约定）与 §13（交付包清单）制定
+
+# 1. 交付成品（Word/PDF 默认不入库；如需归档用 git add -f）
+*.docx
+*.pdf
+
+# 2. 会话中间产物（锚定单 / 内容提取卡 / 设计底稿）
+锚定单_*.md
+内容提取卡_*.md
+*_设计底稿*.md
+
+# 3. 复盘与写库沉淀（策略库 / 话术库 / 材料库 / 复盘记录）
+方法论库/
+*复盘*.md
+
+# 4. 工作目录临时文件
+temp/
+output/
+*.tmp
+*.bak
+*.swp
+*~
+
+# 5. Python / 环境缓存
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# 6. 编辑器与系统文件
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 7. 其他敏感或无关文件
+*.key
+*.pem
+*.log
