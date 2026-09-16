@@ -41,3 +41,6 @@ desktop.ini
 *.key
 *.pem
 *.log
+
+# 8. 本地工具内部记忆（WorkBuddy 等，不上传）
+.workbuddy/

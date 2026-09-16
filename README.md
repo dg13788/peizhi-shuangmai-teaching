@@ -1,4 +1,4 @@
-# 培智·双脉教学引擎（特教 IEP 备课 Skill）V1.0
+# 培智·双脉教学引擎（特教 IEP 备课 Skill）V2.0
 
 > 不拼通用、专精培智、沉淀方法论。
 
@@ -54,9 +54,9 @@ peizhi-shuangmai-teaching/
 ├── CHANGELOG.md                   # 版本变更记录（唯一外部历史）
 ├── CONTRIBUTING.md                # 贡献指南（边界/流程/回归测试/ISSUE 模板）
 ├── docs/
-│   └── release-checklist.md       # 开源上架逐项检查清单（发布前必跑）
+│   ├── release-checklist.md       # 开源上架逐项检查清单（发布前必跑）
+│   └── SKILL_v1.1_archived.md     # V1.1 原文存档（回滚/旧章节号检索）
 ├── examples/
-│   ├── 培智二年级生活数学_5的认识_v1.0.md    # 标准验收基准示例
 │   └── 好吃的水果_教学设计方案.md             # 实跑验证示例（生活语文）
 └── .gitignore                     # 默认排除交付成品与工作中间产物
 ```
@@ -66,7 +66,7 @@ peizhi-shuangmai-teaching/
 - **红区**＝学生姓名、身份证、家庭敏感结构、病历、照片——**零输入零输出**（含 Word/PDF 成品与内容提取卡），学生一律代号"生1/生2…"。
 - 上传附件（含学生照片、含姓名的作业/名单）**不得绕过护栏**；识别前先做红区检测，命中即不识别、不输出、提示脱敏重传。
 - 本 Skill 为教学辅助工具，**不构成医疗/康复建议，不承诺疗效**。
-- 详见 `SKILL.md` §3 授权/隐私边界协议与 LICENSE 附加条款。
+- 详见 `SKILL.md` §0 铁律 1 与 LICENSE 附加条款。
 
 ## 致谢（外部方法论来源）
 
@@ -84,5 +84,5 @@ peizhi-shuangmai-teaching/
 
 ## 版本与兼容性
 
-- 版本：1.0（2026-09-15），语义化版本规则见 `SKILL.md` §10，明细见 [CHANGELOG.md](CHANGELOG.md)。
-- 1.x 各版本保持"六环节＋双 Gate＋四视图＋双格式"主线，向后兼容；跨主版本变更在本 README 标注迁移说明。
+- 版本：2.0（2026-09-16，极限压缩重构），明细见 [CHANGELOG.md](CHANGELOG.md)。
+- 主线"六环节＋双 Gate＋四视图＋双格式"各版本保持不变；V2.0 为结构重构：治理内容外置（LICENSE/CONTRIBUTING/docs），SKILL.md 仅保留运行态引擎，V1.1 原文存档于 `docs/SKILL_v1.1_archived.md`。
