@@ -4,17 +4,27 @@
 背景：V2.2.0 曾手工维护一份 JSON 样例，与 md 源稿存在语义漂移（丢失"阅读"锚点、
      分层作业结构不对齐），违反 Single Source 铁律。本脚本让 JSON 只能由 md 派生，杜绝漂移。
 
-用法：python docs/md_to_json.py [输出目录（默认 examples）]
-输出：<课题>_结构化输出样例.json（合 docs/output-schema.json）
+用法：python scripts/md_to_json.py [输出目录（默认 examples）]
+输出：<课题>_结构化输出样例.json（合 references/output-schema.json）
 约定：md 是唯一源稿；本脚本是唯一转换器；禁止手工编辑产物 JSON。
+报告：写入系统临时目录 %TEMP%/peizhi_shuangmai/（不进仓库/技能包，避免运行期产物混入）。
 """
 import re
 import os
 import json
 import sys
 import glob
+import tempfile
 
-ENGINE_VERSION = '2.4.0'
+ENGINE_VERSION = '2.5.0'
+
+REPORT_DIR = os.path.join(tempfile.gettempdir(), 'peizhi_shuangmai')
+
+
+def report_path(name):
+    """运行期报告一律落系统临时目录（包内不产 *_report.txt）"""
+    os.makedirs(REPORT_DIR, exist_ok=True)
+    return os.path.join(REPORT_DIR, name)
 
 SENSORY_MAP = [
     ('听觉', '听觉'), ('视觉', '视觉'), ('前庭', '前庭与座位'),
@@ -487,7 +497,7 @@ def main():
     rep = ['派生完成：%d 个文件' % len(wrote)]
     for nm, sz in wrote:
         rep.append('  %s（%d 字符）' % (nm, sz))
-    open(os.path.join(root, 'docs', 'md_to_json_report.txt'), 'w', encoding='utf-8').write('\n'.join(rep))
+    open(report_path('md_to_json_report.txt'), 'w', encoding='utf-8').write('\n'.join(rep))
 
 
 if __name__ == '__main__':
@@ -495,6 +505,5 @@ if __name__ == '__main__':
         main()
     except Exception:
         import traceback
-        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        open(os.path.join(root, 'docs', 'md_to_json_report.txt'), 'w',
+        open(report_path('md_to_json_report.txt'), 'w',
              encoding='utf-8').write('ERROR:\n' + traceback.format_exc())

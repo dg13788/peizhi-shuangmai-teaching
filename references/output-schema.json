@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://peizhi-shuangmai-teaching.local/schemas/output-schema.json",
   "title": "培智·双脉教学引擎 结构化教案输出契约",
-  "description": "机器可读教案输出契约（V2.4.0）。硬约束：①逐课时 sum(lessons[].timeline[].minutes) == meta.单课时时长分钟；②len(lessons) == meta.课时数N；③los_table 每生 records 逐课时成对且长度 == meta.课时数N；④support.behavior_card 六要素齐全；⑤学生一律代号，privacy.red_zone_free 必须为 true。本文件不由服务端强校验，由 docs/regression_check.py 执行等价断言。",
+  "description": "机器可读教案输出契约（V2.5.0）。硬约束：①逐课时 sum(lessons[].timeline[].minutes) == meta.单课时时长分钟；②len(lessons) == meta.课时数N；③los_table 每生 records 逐课时成对且长度 == meta.课时数N；④support.behavior_card 六要素齐全；⑤学生一律代号，privacy.red_zone_free 必须为 true。本文件不由服务端强校验，由 scripts/regression_check.py 执行等价断言。",
   "type": "object",
   "required": [
     "schema_version",
@@ -19,7 +19,7 @@
     "privacy"
   ],
   "properties": {
-    "schema_version": { "type": "string", "const": "2.4.0" },
+    "schema_version": { "type": "string", "const": "2.5.0" },
 
     "meta": {
       "type": "object",

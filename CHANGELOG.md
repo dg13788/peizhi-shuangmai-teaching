@@ -4,6 +4,48 @@
 版本号规则：**SemVer 1.0.0 三段格式（主版本.次版本.修订号）**；元数据/文案修正递增修订号，
 结构性重构升大版本，历史条目号已按 SemVer 规范化（1.0→1.0.0、1.1→1.1.0、2.0→2.0.0）。
 
+## [2.5.0] - 2026-09-25
+
+> 技能上传规范专项整改。对照火山引擎 AgentKit / 豆包技能平台上传校验口径（兼顾问类规范的
+> 千问、WorkBuddy），在不改变核心功能的前提下完成合规改造；并确立**双轨制**：
+> 仓库保留 GitHub 治理文件（开发态），上传 zip 由打包器从仓库产出（上传态），两轨同源。
+
+### 头号工作 · 双轨合规（技能平台上传规范 × GitHub 仓库规范）
+- **frontmatter 对齐规范**（原 P0 阻塞项：缺 `description` 会被平台判缺字段）：
+  - 新增必填 `description`（沿用原 description_zh 内容，≤1024 字符、无 XML 标签）；
+  - 顶层字段收敛到规范白名单：`name / description / version / license / compatibility / metadata`；
+    旧非标顶层字段（display_name、display_name_en、description_zh、description_en、tags、
+    requires、author）全部移入 `metadata`（规范允许的 string→string 映射），信息不丢失；
+  - `name` 维持 peizhi-shuangmai-teaching（小写+连字符、≤64、不含 agentkit）。
+- **标准布局**：`docs/` 三脚本迁 `scripts/`，`output-schema.json` 与 `release-checklist.md`
+  迁 `references/`；SKILL.md §4 格式基线完整条文拆至 `references/format-baseline.md`
+  （渐进式披露，SKILL.md 只留核验摘要，≤500 行）。
+- **新增 `scripts/build_package.py` 打包器**：一键产出 `dist/peizhi-shuangmai-teaching.zip`
+  ——顶层技能名目录，仅含 SKILL.md＋scripts/＋references/（含 LICENSE 复制件）＋examples（md+JSON）；
+  自动排除治理文件、`.git/.workbuddy/dist`、`*_report.txt`、`*.docx/*.pdf`；打包前强制执行
+  frontmatter 必检（name/description 合规）与**入包全文红区扫描**（命中即拒绝打包）；
+  固定 zip 时间戳，同一仓库状态产出逐字节恒定。
+- **GitHub 轨保留**：README / CHANGELOG / CONTRIBUTING / LICENSE / .gitignore 全部保留并同步 2.5.0；
+  LICENSE 在打包时自动复制为包内 `references/LICENSE.md`，许可随包分发。
+
+### P0/P1 · 本轮实跑后新发现并修复
+- **`md_to_docx.py` 不创建输出目录**：任意指定 `<成品目录>` 时生成静默失败、`--check` 全 DIFF
+  （旧默认目录 examples 恒存在，属高隐蔽性缺陷）→ 生成模式自动 `makedirs`。
+- **运行期报告污染包体**：`*_report.txt` 原落 `docs/` 会被一并打包/入库 → 三脚本统一改写
+  系统临时目录 `%TEMP%/peizhi_shuangmai/`。
+- **examples/ 二进制成品**：`*.docx` 属"不支持的文件类型"且非技能资产 → 出包出库
+  （回归"成品≡源稿"端到端反篡改校验改在临时目录执行，校验力不降）；`.gitignore`
+  移除 `!examples/*.docx` 白名单，新增 `dist/`。
+- **回归脚本适配双轨**：新增 frontmatter 合规断言组（必填/白名单/name 规则/description ≤1024
+  无 XML）、技能布局断言（scripts/references 齐全、docs/ 已移除、无二进制、无报告件）、
+  GitHub 轨断言（治理文件保留、README 标题与 CHANGELOG 条目同版本）；全部路径断言更新。
+
+### 兼容性说明
+- 引擎主线"六环节＋双 Gate＋四视图＋双格式"零变更；示例教案 md 未改动（仅派生 JSON 随
+  schema_version 同步）；CLI 用法仅默认输出目录参数语义不变、报告位置变化。
+- 版本号六处一致：frontmatter `version` / 正文标题 / `references/output-schema.json` const /
+  两脚本 `ENGINE_VERSION` / CHANGELOG 本条目（示例 JSON 随派生同步）。
+
 ## [2.4.0] - 2026-09-24
 
 > 第四轮三视角主动回测。本轮把上一轮自评中**扣分最重的一项**（排版视角"只有文本基线、

@@ -1,11 +1,16 @@
 # —— 培智·双脉教学引擎 · Git 忽略规则 ——
-# 依据 SKILL.md §6（治理与外部文件）与 docs/release-checklist.md 制定
+# 依据 SKILL.md §6（治理与外部文件）与 references/release-checklist.md 制定
+# 说明：2.5.0 起双轨制——仓库保留治理文件（GitHub 轨）；
+#      上传 zip 由 scripts/build_package.py 产出到 dist/（技能轨，不上传仓库）；
+#      运行期报告一律写系统临时目录 peizhi_shuangmai/，不进仓库。
 
-# 1. 交付成品（会话产出的 Word/PDF 默认不入库；如需归档用 git add -f）
+# 1. 交付成品（会话产出的 Word/PDF 一律不入库；2.5.0 起 examples/ 不再保留 docx 基准，
+#    "成品≡源稿"端到端校验由回归脚本在临时目录执行）
 *.docx
 *.pdf
-# 例外：examples/ 下的 docx 是**回归基准产物**（回归断言"落盘 docx ≡ 源稿派生"依赖它），必须入库
-!examples/*.docx
+
+# 1b. 打包产物（技能上传 zip，本地生成，不入库）
+dist/
 
 # 2. 会话中间产物（锚定单 / 内容提取卡 / 设计底稿）
 锚定单_*.md

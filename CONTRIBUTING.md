@@ -29,7 +29,7 @@
 
 ## 3. 回归测试最小集（发布前必跑）
 
-PR 合并前必须通过以下九项（详见 `docs/release-checklist.md` 第八节）：
+PR 合并前必须通过以下九项（详见 `references/release-checklist.md`）：
 
 - [ ] 示例课题实跑 1 篇，产出一致（每课时五列表〔含 BOPPPS 步别、≥1 个探究活动、
       时间合计=该课时时长〕、分课时目标矩阵、LOS 表逐课时成对列且全生覆盖）
@@ -39,15 +39,18 @@ PR 合并前必须通过以下九项（详见 `docs/release-checklist.md` 第八
       （字号下限、对比度 ≥7:1、色彩不得单靠颜色区分、黑体无衬线、表格有表头不溢出）
 - [ ] 多课时教案必带**跨课时行为干预支持卡**六要素齐全、强化计划逐课时削弱、
       晋级降级阈值含 80% 判据、危机处置四条红线（禁体罚/禁惩罚性隔离/禁强制进食/禁当众批评）
-- [ ] 机器可读产物合 `docs/output-schema.json`（`anchors` 每条三级齐全，含 timeline 步别枚举与逐课时时间恒等硬约束）
-- [ ] **Single Source**：结构化 JSON 已由 md 源稿经 `python docs/md_to_json.py` 派生（**禁止手工编辑 JSON**），且"落盘样例≡派生结果"PASS
-- [ ] **Word 成品**：已用 `python docs/md_to_docx.py` 生成（**禁手工排版 markdown 产物**），
-      落盘 docx ≡ 源稿派生且字节幂等；需要时加 `--pdf` 导出（三通道皆无时须给出降级指引）
-- [ ] `python docs/regression_check.py` 全项 PASS，报告已更新至
-      `docs/regression_report.txt`（通过率必须为 100%，项数以报告为准；含引擎自身防漂移校验：
-      frontmatter 字段、SemVer、版号多处一致、五条铁律表述、外部引用存在性；
-      含 md→JSON 派生一致性与 Word 成品结构/版式/反篡改）
+- [ ] 机器可读产物合 `references/output-schema.json`（`anchors` 每条三级齐全，含 timeline 步别枚举与逐课时时间恒等硬约束）
+- [ ] **Single Source**：结构化 JSON 已由 md 源稿经 `python scripts/md_to_json.py` 派生（**禁止手工编辑 JSON**），且"落盘样例≡派生结果"PASS
+- [ ] **Word 成品**：已用 `python scripts/md_to_docx.py <成品目录>` 生成（**禁手工排版 markdown 产物**），
+      `--check` 判定成品 ≡ 源稿派生且字节幂等；需要时加 `--pdf` 导出（三通道皆无时须给出降级指引）
+- [ ] `python scripts/regression_check.py` 全项 PASS（通过率必须为 100%，项数以报告为准；
+      报告写系统临时目录 `peizhi_shuangmai/regression_report.txt`；含引擎自身防漂移校验：
+      frontmatter 合规、SemVer、版号多处一致、五条铁律表述、外部引用存在性；
+      含 md→JSON 派生一致性、Word 成品结构/版式/反篡改与双轨合规）
 - [ ] 全库扫描无真实姓名/照片/病历（红区零输入）
+
+> 发布到技能平台前追加一步：`python scripts/build_package.py` 产出 `dist/*.zip`，
+> 按 `references/release-checklist.md` 双轨清单逐项核对（打包器已强制 frontmatter 必检＋入包红区扫描）。
 
 ## 4. 红区护栏红线（不可协商）
 

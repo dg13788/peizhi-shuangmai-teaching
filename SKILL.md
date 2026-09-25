@@ -1,18 +1,18 @@
 ---
 name: peizhi-shuangmai-teaching
-display_name: 培智·双脉教学引擎（特教 IEP 备课 Skill）
-display_name_en: Peizhi Dual-Track Teaching Engine (Special Education IEP Lesson-Planning Skill)
-version: 2.4.0
-author: Xd_香墩
-description_zh: 面向培智学校（及同类个别化教学）各学科的备课与教学设计 Skill。触发词：备课 / 教案 / 教学设计 / IEP 个别化教育计划 / 上传教材照片备课 / 趣味化教学方案 / BOPPPS 教案。以"个别化×生活化"双脉为主干、BOPPPS 为组织骨架、趣味化参与式学习为核心，支持 1~N 课时单元课设计，产出可测、可 LOS 六级分层、可迁移到真实生活的教学方案，经内置脚本一键交付 Word/PDF 成品；内置红区隐私护栏、双 Gate 低打扰确认、五维感官调节前置、跨课时行为干预递进、IEP 长期目标累计追踪与 4×3 知识类型策略路由。
-description_en: "A lesson-planning and instructional-design skill for Peizhi schools (schools for students with intellectual disabilities) and similar individualized special-education settings. Trigger words: lesson prep / teaching plan / instructional design / IEP / prepare a lesson from textbook photos / gamified lesson plan / BOPPPS lesson plan. Built on the \"individualization × life relevance\" dual track, with BOPPPS as the organizing framework and playful participatory learning at its core, it supports 1-to-N lesson unit design and produces measurable, LOS six-level tiered, real-life transferable teaching plans delivered as Word/PDF through built-in scripts, with five-dimension sensory pre-adjustment, built-in red-zone privacy guardrails, a dual-gate low-interruption confirmation protocol, cross-lesson behavior-intervention progression, and a 4x3 knowledge-type strategy routing matrix."
-tags: [培智, 特教, IEP, 个别化教育, 教学设计, 备课, 分层教学, LOS, AAC, PBS, BOPPPS, 趣味化教学]
-compatibility: [豆包, DeepSeek, Kimi, ChatGPT, Marvis, WorkBuddy, 任意支持长提示词/文件系统/附件上传的 AI 平台]
-license: MIT（含红区护栏不可移除附加条款，见 LICENSE）
-requires: 文件系统环境（Word/PDF 交付）或纯对话环境（文本回退）；附件识别需平台支持上传或文本粘贴
+description: 面向培智学校（及同类个别化教学）各学科的备课与教学设计 Skill。触发词：备课 / 教案 / 教学设计 / IEP 个别化教育计划 / 上传教材照片备课 / 趣味化教学方案 / BOPPPS 教案。以"个别化×生活化"双脉为主干、BOPPPS 为组织骨架、趣味化参与式学习为核心，支持 1~N 课时单元课设计，产出可测、可 LOS 六级分层、可迁移到真实生活的教学方案，经内置脚本一键交付 Word/PDF 成品；内置红区隐私护栏、双 Gate 低打扰确认、五维感官调节前置、跨课时行为干预递进、IEP 长期目标累计追踪与 4×3 知识类型策略路由。
+version: 2.5.0
+license: MIT＋红区护栏不可移除附加条款（全文见 LICENSE；上传包内为 references/LICENSE.md）
+compatibility: 豆包 / 千问 / DeepSeek / Kimi / ChatGPT / WorkBuddy 等支持长提示词与附件上传的 AI 平台；Word/PDF 成品交付需文件系统环境，纯对话环境自动回退四视图文本交付
+metadata:
+  author: Xd_香墩
+  display_name: 培智·双脉教学引擎（特教 IEP 备课 Skill）
+  display_name_en: Peizhi Dual-Track Teaching Engine (Special Education IEP Lesson-Planning Skill)
+  description_en: "A lesson-planning and instructional-design skill for Peizhi schools (schools for students with intellectual disabilities) and similar individualized special-education settings. Trigger words: lesson prep / teaching plan / instructional design / IEP / prepare a lesson from textbook photos / gamified lesson plan / BOPPPS lesson plan. Built on the individualization × life-relevance dual track, with BOPPPS as the organizing framework and playful participatory learning at its core, it supports 1-to-N lesson unit design and produces measurable, LOS six-level tiered, real-life transferable teaching plans delivered as Word/PDF through built-in scripts, with five-dimension sensory pre-adjustment, built-in red-zone privacy guardrails, a dual-gate low-interruption confirmation protocol, cross-lesson behavior-intervention progression, and a 4x3 knowledge-type strategy routing matrix."
+  tags: 培智,特教,IEP,个别化教育,教学设计,备课,分层教学,LOS,AAC,PBS,BOPPPS,趣味化教学
 ---
 
-# 培智 · 双脉教学引擎 V2.4.0
+# 培智 · 双脉教学引擎 V2.5.0
 
 ## 0. 定位与铁律
 
@@ -50,7 +50,7 @@ requires: 文件系统环境（Word/PDF 交付）或纯对话环境（文本回�
 - **可选**（缺失用合理默认＋假设清单，学情除外，见铁律 2）：课时数 N、班级人数与 A/B/C 分层、障碍类型、IEP 目标、教材版本、单课时时长、授课日期、执教者、支持需求。
 - **附件**：图片（课文/教材页/教具/板书/作业照片）、文档（教材 PDF/Word、课文文本、课标文件、IEP 模板、教案模板）、粘贴文本（等价识别）——仅作教学内容来源，受铁律 1 约束。
 
-**快速开始示例**：「请按培智·双脉教学引擎（V2.4.0）备一节培智二年级生活数学课，课题：5 的认识。班级：二年级（1）班，缺的基线按合理默认补全并列假设清单。」附件驱动与外部 BOPPPS/趣味化提示词模板原生兼容，触发后流程一致。安装：放入平台 skills 目录，或复制本文件全文作系统提示词。
+**快速开始示例**：「请按培智·双脉教学引擎（V2.5.0）备一节培智二年级生活数学课，课题：5 的认识。班级：二年级（1）班，缺的基线按合理默认补全并列假设清单。」附件驱动与外部 BOPPPS/趣味化提示词模板原生兼容，触发后流程一致。安装：上传 `scripts/build_package.py` 产出的技能 zip 至技能平台（豆包/千问/WorkBuddy），或复制本文件全文作系统提示词。
 
 ## 2. 六环节工作流（有附件先走 0.5，即 0.5→0→1→2→3→3.5→4→5；无附件直入环节 0）
 
@@ -111,10 +111,10 @@ requires: 文件系统环境（Word/PDF 交付）或纯对话环境（文本回�
 - **待替换项清单**：集中置于教师全量版文末"附：待替换项与假设清单（教师版使用，不随归档）"；教务归档视图不得出现。
 
 ### 环节 3.5 · 格式交付（辅助环节，**禁止手工重排，一律走脚本**）
-1. **docx（唯一执行通道）**：`python docs/md_to_docx.py examples` → 由脚本读 md 生成 docx，§4 全部版式约束（A4/页边距/字号行距/字体/表格表头重复/列宽比例/封面独立节无页码/页脚页码）由**代码固化**，禁止在上下文内重新排版；成品过结构校验（OOXML 良构校验＋外部读取复校）后才算交付。
+1. **docx（唯一执行通道）**：`python scripts/md_to_docx.py <成品目录>` → 由脚本读 md 生成 docx，§4 全部版式约束（A4/页边距/字号行距/字体/表格表头重复/列宽比例/封面独立节无页码/页脚页码）由**代码固化**，禁止在上下文内重新排版；成品过结构校验（OOXML 良构校验＋外部读取复校）后才算交付。
 2. **pdf**：同一脚本加 `--pdf`（自动依次尝试 Word COM → docx2pdf → LibreOffice）；三者皆不可用时，提示在 Word/WPS 内「另存为 PDF」并确认中文字体内嵌与自然分页。
 3. **命名**：`{{课题}}_教学设计方案_{N}课时.docx/.pdf`；封面两行版式（第一行"启智·{学科}·教学设计方案"，第二行"《{课题}》"，居中黑体二号，禁版本号/"教案"字样）；**成品零引擎元信息**（无生成引擎/人格/版本/安全提示/学情来源路径——元信息只留在锚定单与提取卡）。
-4. **交付前必跑**：`python docs/md_to_json.py`（结构化派生）→ `python docs/md_to_docx.py` → `python docs/md_to_docx.py examples --check`（成品≡源稿，防手工改动）→ `python docs/regression_check.py`（须 100% PASS）。无文件环境回退四视图文本交付。
+4. **交付前必跑**：`python scripts/md_to_json.py`（结构化派生）→ `python scripts/md_to_docx.py <成品目录>` → `python scripts/md_to_docx.py <成品目录> --check`（成品≡源稿，防手工改动）→ `python scripts/regression_check.py`（须 100% PASS）。无文件环境回退四视图文本交付。
 
 ### 环节 4 · 课堂实施
 LOS 分层表（A 独立·口令提示·步骤卡；B 半独立·关键词提示·图卡·少量肢体辅助；C 辅助·手势示范·实物示范·全辅助或 AAC）；三时点评估（课前基线→课中过程→课后达成）；前测与基线不符时当堂调 LOS 起点并记备注；各课时后测当堂结果即该课时结束 LOS 第一证据。
@@ -134,26 +134,15 @@ LOS 分层表（A 独立·口令提示·步骤卡；B 半独立·关键词提示
 
 矩阵为内部机制，不进交付正文。
 
-## 4. 成品格式基线（Word/PDF 统一执行）
+## 4. 成品格式基线（核验摘要；完整条文见 references/format-baseline.md）
 
-> **本基线已代码化**：`docs/md_to_docx.py` 是 Word 成品的**唯一执行通道**（A4、页边距、字号行距、中西文字体、表格表头跨页重复、五列表列宽比、封面独立节无页码、页脚页码均在代码中强制）。下列条文为**契约说明与人工核验口径**；生成时禁在上下文里手工重排 markdown。
+> **本基线已代码化**：`scripts/md_to_docx.py` 是 Word 成品的**唯一执行通道**（A4、页边距、字号行距、中西文字体、表格表头跨页重复、五列表列宽比、封面独立节无页码、页脚页码均在代码中强制）；生成时禁在上下文里手工重排 markdown。以下为**人工核验口径摘要**，完整条文（字距行距区间、单行字数、图形线宽、低视力放大等）见 `references/format-baseline.md`。
 
-**排版与结构（排版设计师视角）**：
-- 页面 A4；页边距上/下 2.54cm、左/右 3.18cm；正文宋体小四（12pt）1.5 倍行距，西文数字 Times New Roman；一级标题黑体三号加粗、二级黑体小四加粗、三级黑体五号加粗；中文全角标点；{{}} 占位符原样保留。
-- **表格必有表头行**（如教案头用 `| 项目 | 内容 |`），表头加粗居中；字号≥小五（9pt）；列宽合计自适应页宽、禁溢出；**表格跨页须重复表头行**；分页禁标题孤行。
-- **页眉不放任何引擎元信息，页脚居中页码（第 X 页 共 Y 页）**；封面不出现页码或独立计页。
-- **章节用中文数字编号（一、二、三…），表格连续编号（表1、表2…）**，正文引用与表号一致，禁跳号。
-- **五列表防溢出**：A4 纵向优先；列宽按"环节 14% / 教师活动 26% / 学生活动 20% / 支持策略 24% / 设计意图 16%"分配，内容超限时该表改横向页或降为小五，禁压缩到不可读、禁溢出页面。
-- **md 源稿两行一级标题连续相邻**（中间禁空行），保证转 docx 后为封面双行标题。
-
-**无障碍基线（低视力/阅读困难/色觉障碍生可读，必执行）**：
-- **字号下限**：正文≥12pt（小四），表格≥9pt（小五），脚注≥8pt；**学生可视材料**（板书大字卡、图卡标签、投屏页）标签≥24pt（二号）、课题与关键句≥36pt（一号），按教室后排 3m 可读反推。
-- **对比度**：正文与学生可视材料 ≥7:1（WCAG AAA），任何元素不低于 4.5:1（AA）；禁浅灰字（明度 ≥#999）、禁低对比彩字、禁在图案与照片上直接叠印文字。
-- **色彩双编码**：层级、对错、分组、A/B/C 分层的区分**不得仅依赖颜色**（禁红绿并列作唯一区分），必须叠加形状/符号/文字标签；底色用低饱和浅色配深色字。
-- **字体与间距**：学生可视材料与标题用黑体（无衬线），禁书法/装饰/手写体；字距≥1.0、行距 1.5~1.75、段首缩进 2 字符；单行≤30 字（投屏≤20 字）；低视力生材料放大至 18pt 并加行距。
-- **图形**：线条≥1.5pt，关键笔画≥3mm，图形与文字联动标注。
-
-**教师 30 秒自查**：①两行标题居中 ②宋体小四 1.5 倍 ③西文 Times New Roman ④表格有表头、不溢出 ⑤无引擎元信息 ⑥{{}} 仍在 ⑦素材附页无红区 ⑧每课时时间合计＝课时时长、LOS 表逐课时成对列 ⑨学生可视材料够大够清楚、不靠颜色单一区分。
+- **页面与字体**：A4；页边距上/下 2.54cm、左/右 3.18cm；正文宋体小四（12pt）1.5 倍行距，西文数字 Times New Roman；一/二/三级标题黑体分级加粗；中文全角标点；{{}} 占位符原样保留。
+- **表格**：必有表头行（加粗居中）；字号≥小五（9pt）；列宽合计自适应页宽、禁溢出；**跨页须重复表头行**；分页禁标题孤行；五列表列宽比"环节 14 / 教师活动 26 / 学生活动 20 / 支持策略 24 / 设计意图 16"，超限改横向页或降小五，禁压缩到不可读。
+- **页码与编号**：页眉零引擎元信息；页脚居中页码（第 X 页 共 Y 页）；封面独立成节、不出现页码；章节中文数字编号（一、二、三…），表格连续编号（表1、表2…）禁跳号；md 源稿两行一级标题连续相邻（转 docx 后为封面双行标题）。
+- **无障碍底线**：正文≥12pt、表格≥9pt；学生可视材料标签≥24pt、课题与关键句≥36pt（按教室后排 3m 可读反推）；对比度正文与学生可视材料 ≥7:1、任何元素不低于 4.5:1；层级/对错/分组/A/B/C 分层**不得仅依赖颜色**，须叠加形状/符号/文字标签；学生可视材料与标题用黑体（无衬线），禁书法/装饰/手写体。
+- **教师 30 秒自查**：①两行标题居中 ②宋体小四 1.5 倍 ③西文 Times New Roman ④表格有表头、不溢出 ⑤无引擎元信息 ⑥{{}} 仍在 ⑦素材附页无红区 ⑧每课时时间合计＝课时时长、LOS 表逐课时成对列 ⑨学生可视材料够大够清楚、不靠颜色单一区分。
 
 ## 5. 状态与容错
 
@@ -164,15 +153,17 @@ LOS 分层表（A 独立·口令提示·步骤卡；B 半独立·关键词提示
 - **退出**：用户终止或红区信息被输入→立即停止并提醒"红区零输入"，不生成任何含红区信息的产物。
 - **平台适配**：无状态平台（豆包/Kimi 等）Gate 以"回复确认"推进；有文件系统平台默认 Word+PDF 双格式并过 §4 核验。
 - **上下文预算（防长教案生成到一半被截断）**：①**一次一课时**：多课时按课时串行生成，完成即落盘锚定单，不在上下文内同时铺开全部课时；②**N>3 的单元课直接拆分为多个锚定单**，先总则后分课时；③**压缩优先级**：超限时优先压缩"设计意图"列与叙事性描述，**目标矩阵 / 五列表 / LOS 表 / IEP 追踪表 / 安全替代表 / 支持卡一律不可压缩、不可省略**；④**不在上下文内做格式转换或重排**（一律调用 §3.5 的脚本）；⑤恢复会话先读锚定单，只补齐当前环节所需，不复读全文。
-- **幂等与产物一致性（品质要求的硬保证）**：①**同源**：md 是唯一源稿，JSON 与 docx 只能由 `docs/md_to_json.py` / `docs/md_to_docx.py` 派生，**禁手工编辑任何产物**；②**字节幂等**：同一 md 生成的 docx 逐字节恒定（已固定压缩时间戳与部件顺序），`python docs/md_to_docx.py examples --check` 可验证交付件是否被改过或与源稿失同步；③**改动顺序**：先改 md → 重跑派生与生成 → 再跑回归，**顺序颠倒即视为产物漂移**；④重跑**不得追加或重复编号**（禁在已有文件尾部追加表格或章节），重跑即全量重写同名文件。
+- **幂等与产物一致性（品质要求的硬保证）**：①**同源**：md 是唯一源稿，JSON 与 docx 只能由 `scripts/md_to_json.py` / `scripts/md_to_docx.py` 派生，**禁手工编辑任何产物**；②**字节幂等**：同一 md 生成的 docx 逐字节恒定（已固定压缩时间戳与部件顺序），`python scripts/md_to_docx.py <成品目录> --check` 可验证交付件是否被改过或与源稿失同步；③**改动顺序**：先改 md → 重跑派生与生成 → 再跑回归，**顺序颠倒即视为产物漂移**；④重跑**不得追加或重复编号**（禁在已有文件尾部追加表格或章节），重跑即全量重写同名文件。
 
 ## 6. 治理与外部文件（不在本文件展开）
 
-- 授权/隐私边界/引用致谢：见 LICENSE 与 README（MIT＋红区护栏不可移除条款；使用者承诺红区零输入、输出脱敏、责任自担、不承诺疗效）。
-- 版本规则/回归测试/贡献边界/上架清单：见 CHANGELOG.md / CONTRIBUTING.md / docs/release-checklist.md。
-- 回归基准示例：`examples/认识5_教学设计方案_2课时.md`（多课时基准）、`examples/好吃的水果_教学设计方案_3课时.md`（多课时＋生活语文基准）——任何引擎规则变更须回改示例保持一致，并跑 `python docs/regression_check.py`。
-- **结构化输出契约**：机器可读产物必须合 `docs/output-schema.json`（JSON Schema draft 2020-12）。顶层必填 `schema_version / meta / anchors[] / lessons[] / los_table / support / generalization / safety_alternatives / sensory_regulation / iep_tracking / materials / privacy`（与 `docs/output-schema.json` 的 `required` 逐项一致，回归自动校验）；**`anchors` 为数组**（一课常挂多个领域条目，每条须到三级）；`lessons[].timeline[].step` 取自枚举 `B|O|P前|P参|P后|S`；硬约束：逐课时 `sum(timeline[].minutes) == meta.单课时时长分钟`、`len(lessons) == meta.课时数N`、`support.behavior_card` 六要素齐全、`los_table[].records` 逐课时成对、学生代号合 `^生\d+$`、`privacy.red_zone_free = true`。
-- **Single Source 硬约束**：结构化 JSON **只可由 md 源稿经 `docs/md_to_json.py` 派生，禁止手工编辑**（手工样例曾导致锚点丢失与作业结构漂移）；改教案须先改 md 再重跑派生，样本见 `examples/好吃的水果_结构化输出样例.json`。
-- **成品 Word/PDF 生成契约**：Word 成品**只能**由 `docs/md_to_docx.py` 生成（零第三方依赖、字节幂等、生成前红区扫描命中即拒绝落盘）；PDF 由同一脚本 `--pdf` 导出或在 Word/WPS 另存。禁止由 LLM 手工重写或二次排版 markdown 产物；成品与源稿是否失同步，用 `python docs/md_to_docx.py examples --check` 验证（见环节 3.5 第 4 条）。
-- **版本一致性**：`schema_version` 为契约版本锁（`const`），升版本须同步 `docs/output-schema.json` 的常量与 `docs/md_to_json.py` 的 `ENGINE_VERSION`，与 SKILL.md `version` 四处一致（回归脚本已自动校验）。
-- 2.4.0 保持"六环节＋双 Gate＋四视图＋双格式"主线向后兼容，新增五维感官调节前置、IEP 长期目标跨课时累计追踪、Gate 话术模板、上下文预算与幂等策略，并把 §4 格式基线代码化（`docs/md_to_docx.py`）。
+- **双轨制（2.5.0 起）**：**仓库轨**（GitHub）保留 `README.md` / `CHANGELOG.md` / `CONTRIBUTING.md` / `LICENSE` 等治理文件；**上传轨**（豆包/千问/WorkBuddy 技能平台）由 `python scripts/build_package.py` 从仓库一键产出 `dist/peizhi-shuangmai-teaching.zip`（顶层技能名目录，仅含 SKILL.md＋scripts/＋references/＋examples/，自动排除治理文件、二进制成品与运行期报告，打包前红区扫描＋frontmatter 必检）。两轨同源，禁止手工拼装上传包。
+- 授权/隐私边界/引用致谢：见 `LICENSE`（MIT＋红区护栏不可移除条款；使用者承诺红区零输入、输出脱敏、责任自担、不承诺疗效；打包时由 build_package.py 自动复制为包内 references/LICENSE.md）。
+- 版本规则/回归测试/贡献边界/上架清单：见 `CHANGELOG.md` / `CONTRIBUTING.md` / `references/release-checklist.md`。
+- 回归基准示例：`examples/认识5_教学设计方案_2课时.md`（多课时基准）、`examples/好吃的水果_教学设计方案_3课时.md`（多课时＋生活语文基准）——任何引擎规则变更须回改示例保持一致，并跑 `python scripts/regression_check.py`（须 100% PASS）。
+- **结构化输出契约**：机器可读产物必须合 `references/output-schema.json`（JSON Schema draft 2020-12）。顶层必填 `schema_version / meta / anchors[] / lessons[] / los_table / support / generalization / safety_alternatives / sensory_regulation / iep_tracking / materials / privacy`（与 `references/output-schema.json` 的 `required` 逐项一致，回归自动校验）；**`anchors` 为数组**（一课常挂多个领域条目，每条须到三级）；`lessons[].timeline[].step` 取自枚举 `B|O|P前|P参|P后|S`；硬约束：逐课时 `sum(timeline[].minutes) == meta.单课时时长分钟`、`len(lessons) == meta.课时数N`、`support.behavior_card` 六要素齐全、`los_table[].records` 逐课时成对、学生代号合 `^生\d+$`、`privacy.red_zone_free = true`。
+- **Single Source 硬约束**：结构化 JSON **只可由 md 源稿经 `scripts/md_to_json.py` 派生，禁止手工编辑**（手工样例曾导致锚点丢失与作业结构漂移）；改教案须先改 md 再重跑派生，样本见 `examples/好吃的水果_结构化输出样例.json`。
+- **成品 Word/PDF 生成契约**：Word 成品**只能**由 `scripts/md_to_docx.py` 生成（零第三方依赖、字节幂等、生成前红区扫描命中即拒绝落盘）；PDF 由同一脚本 `--pdf` 导出或在 Word/WPS 另存。禁止由 LLM 手工重写或二次排版 markdown 产物；成品与源稿是否失同步，用 `python scripts/md_to_docx.py <成品目录> --check` 验证（见环节 3.5 第 4 条）。
+- **版本一致性**：`schema_version` 为契约版本锁（`const`），升版本须同步 `references/output-schema.json` 的常量与 `scripts/md_to_json.py`、`scripts/md_to_docx.py` 的 `ENGINE_VERSION`，并与 SKILL.md frontmatter `version`、正文标题、CHANGELOG 条目六处一致（回归脚本已自动校验）。
+- **版本沿革**：2.0.0 极限压缩、治理外置 → 2.1.0 多课时模型 → 2.2.0 PBS 行为干预＋无障碍基线＋Schema → 2.3.0 Single Source 派生 → 2.4.0 Word 生成器代码化 → 2.5.0 双轨合规（frontmatter 对齐 name/description 规范、scripts/references 标准布局、新增打包器产出技能上传 zip、仓库治理文件保留）。
+- 2.5.0 保持"六环节＋双 Gate＋四视图＋双格式"主线向后兼容；无脚本执行环境的平台（纯对话）全程走四视图文本交付回退（见 §5 降级）。

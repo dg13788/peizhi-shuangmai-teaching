@@ -2,17 +2,19 @@
 # -*- coding: utf-8 -*-
 """培智·双脉教学引擎 —— 全量回归校验（当前引擎版本见 SKILL.md front-matter）
 
-用法：python docs/regression_check.py      （发布前须 100% PASS）
+用法：python scripts/regression_check.py      （发布前须 100% PASS）
 校验分组：
   ① 教案基准 examples/*.md：BOPPPS 六步 / 每课时时间恒等 / 探究活动 / LOS 成对列 /
      表头行 / 表号章节号 / 占位符 / 红区 / 行为支持卡 / 感官调节 / IEP 累计追踪 / 无障碍说明
-  ② 结构化契约 docs/output-schema.json 与 examples/*结构化输出样例.json
-  ③ 引擎自身 SKILL.md：上架字段 / SemVer / 版号一致 / 五条铁律 / 外部引用存在性
+  ② 结构化契约 references/output-schema.json 与 examples/*结构化输出样例.json
+  ③ 引擎自身 SKILL.md：frontmatter 合规（name/description/version 必填 + 规范白名单）/
+     SemVer / 版号一致 / 五条铁律 / 外部引用存在性
   ④ md→JSON 派生一致性（Single Source，含"落盘样例 ≡ 派生结果"防漂移）
-  ⑤ Word 成品 md→docx：OOXML 包完整性与元素序列 / 版式契约 / 字节幂等 / 反篡改 / 外部读取复校
-  ⑥ 交付通道契约：CLI 参数 / PDF 降级 / --check 判定
-  ⑦ 仓库卫生与治理一致性：临时件 / .gitignore / 版本号 / 章节号 / 不硬编码项数
-输出：docs/regression_report.txt（UTF-8）
+  ⑤ Word 成品 md→docx：OOXML 包完整性与元素序列 / 版式契约 / 字节幂等 / 外部读取复校
+  ⑥ 交付通道契约：CLI 参数 / PDF 降级 / --check 反篡改（临时目录端到端）
+  ⑦ 双轨合规与仓库卫生：技能标准布局（scripts/references/examples）/ 无二进制成品 /
+     无运行期报告 / GitHub 治理文件保留且版本同步（README/CHANGELOG）/ 章节号 / 不硬编码项数
+输出：%TEMP%/peizhi_shuangmai/regression_report.txt（UTF-8；报告不进仓库）
 元断言：同一分节内重复计入的断言必须为 0（防止通过率虚高）
 """
 import re
@@ -21,9 +23,18 @@ import sys
 import json
 import glob
 import hashlib
+import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEP = re.compile(r'^[\s\-:|]+$')
+
+REPORT_DIR = os.path.join(tempfile.gettempdir(), 'peizhi_shuangmai')
+
+
+def report_path(name):
+    """运行期报告一律落系统临时目录（包内不产 *_report.txt）"""
+    os.makedirs(REPORT_DIR, exist_ok=True)
+    return os.path.join(REPORT_DIR, name)
 
 
 def blocks(lines):
@@ -229,7 +240,7 @@ def read_engine_version(root):
 def check_schema(root, ev=''):
     """结构化输出契约与样例校验"""
     r = []
-    sp = os.path.join(root, 'docs', 'output-schema.json')
+    sp = os.path.join(root, 'references', 'output-schema.json')
     try:
         schema = json.load(open(sp, encoding='utf-8'))
         r.append(('Schema 文件为合法 JSON', True))
@@ -358,7 +369,7 @@ def check_schema(root, ev=''):
 def check_derived(root, ev=''):
     """md → JSON 派生一致性校验（Single Source 硬保证）"""
     r = []
-    sys.path.insert(0, os.path.join(root, 'docs'))
+    sys.path.insert(0, os.path.join(root, 'scripts'))
     try:
         import md_to_json as M
         r.append(('派生器 ENGINE_VERSION 与引擎一致', M.ENGINE_VERSION == ev,
@@ -408,7 +419,7 @@ def check_derived(root, ev=''):
         if os.path.exists(p):
             saved = json.load(open(p, encoding='utf-8'))
             same = json.dumps(saved, sort_keys=True, ensure_ascii=False) == json.dumps(data, sort_keys=True, ensure_ascii=False)
-            r.append((tag + ' 落盘样例≡派生结果(防漂移)', same, '' if same else '须重跑 docs/md_to_json.py'))
+            r.append((tag + ' 落盘样例≡派生结果(防漂移)', same, '' if same else '须重跑 scripts/md_to_json.py'))
     return r
 
 
@@ -422,16 +433,33 @@ def check_skill_md(root):
         return [('SKILL.md frontmatter 存在', False)]
     head = fm.group(1)
     keys = [l.split(':', 1)[0] for l in head.splitlines() if l and not l.startswith(' ')]
-    need = ['name', 'display_name', 'display_name_en', 'version', 'author',
-            'description_zh', 'description_en', 'tags', 'license']
+    # —— AgentKit / 豆包 / 千问技能规范（2.5.0 起）：name+description 必填、version 平台解析、
+    #    其余顶层字段仅限规范白名单（license/compatibility/metadata/allowed-tools）——
+    need = ['name', 'description', 'version']
     miss = [k for k in need if k not in keys]
-    r.append(('SKILL.md 上架字段齐全', not miss, '缺' + ','.join(miss) if miss else ''))
+    r.append(('frontmatter 必填字段齐全(name/description/version)', not miss,
+              '缺' + ','.join(miss) if miss else ''))
+    allowed = {'name', 'description', 'version', 'license', 'compatibility',
+               'metadata', 'allowed-tools'}
+    extra = [k for k in keys if k not in allowed]
+    r.append(('frontmatter 顶层字段不超出规范白名单', not extra, ','.join(extra)))
+    banned = ['display_name', 'display_name_en', 'description_zh', 'description_en',
+              'tags', 'requires', 'author']
+    left = [k for k in banned if k in keys]
+    r.append(('旧版非标顶层字段已移除(防平台解析异常)', not left, ','.join(left)))
+    nm = re.search(r'^name: (.+)$', head, re.M)
+    nm_v = nm.group(1).strip() if nm else ''
+    r.append(('name 合规(小写+连字符,≤64,不含agentkit)',
+              bool(re.match(r'^[a-z0-9]+(-[a-z0-9]+)*$', nm_v))
+              and len(nm_v) <= 64 and 'agentkit' not in nm_v, nm_v))
+    ds = re.search(r'^description: (.+)$', head, re.M)
+    ds_v = ds.group(1).strip() if ds else ''
+    r.append(('description 非空且≤1024字符', 0 < len(ds_v) <= 1024, '%d字符' % len(ds_v)))
+    r.append(('description 不含 XML 标签', not re.search(r'<[A-Za-z/!]', ds_v)))
     ver = re.search(r'^version: (.+)$', head, re.M)
     ok_semver = bool(ver and re.match(r'^\d+\.\d+\.\d+$', ver.group(1).strip()))
     r.append(('SKILL.md version 为 SemVer 三段', ok_semver, ver.group(1) if ver else ''))
-    en_line = re.search(r'^description_en: ".*"$', head, re.M)
-    r.append(('description_en 引号闭合(YAML安全)', bool(en_line)))
-    # 版本号四处一致：SKILL.md / 标题 / 快速开始 / JSON 样例 schema_version
+    # 版本号多处一致：frontmatter / 正文标题 / JSON 样例 schema_version（脚本与 Schema 由派生组校验）
     v = ver.group(1).strip() if ver else ''
     jf = glob.glob(os.path.join(root, 'examples', '*结构化输出样例.json'))
     sv = ''
@@ -455,7 +483,7 @@ def check_skill_md(root):
     miss_a = [k for k in acc if k not in text]
     r.append(('无障碍基线保留', not miss_a, '缺' + ','.join(miss_a) if miss_a else ''))
     # 外部引用存在性（防改名失联）
-    refs = re.findall(r'`(docs/[\w\.\-]+|examples/[\w一-龥\.\-]+\.(?:md|json))`', text)
+    refs = re.findall(r'`((?:scripts|references)/[\w\.\-]+|examples/[\w一-龥\.\-]+\.(?:md|json))`', text)
     broken = [x for x in set(refs) if not os.path.exists(os.path.join(root, x.replace('/', os.sep)))]
     r.append(('SKILL.md 外部引用均存在', not broken, ','.join(broken)))
     return r
@@ -466,7 +494,7 @@ def check_docx(root):
     import zipfile
     import xml.dom.minidom as minidom
     r = []
-    sys.path.insert(0, os.path.join(root, 'docs'))
+    sys.path.insert(0, os.path.join(root, 'scripts'))
     try:
         import md_to_docx as G
         r.append(('可导入 md_to_docx 生成器', True))
@@ -489,16 +517,8 @@ def check_docx(root):
             G.build_docx_bytes(text)).hexdigest()
         r.append((tag + ' docx 字节级幂等', same_idem))
 
-        # ② 已交付成品必须与源稿一致（防手工改动/失同步）
-        dest = os.path.join(root, 'examples', G.plan_name(text, nm[:-3]))
-        if os.path.exists(dest):
-            disk = open(dest, 'rb').read()
-            r.append((tag + ' 落盘 docx ≡ 源稿派生(防漂移)', hashlib.sha256(disk).hexdigest()
-                      == hashlib.sha256(data).hexdigest(), os.path.basename(dest)))
-        else:
-            r.append((tag + ' 落盘 docx 存在', False, os.path.basename(dest)))
-
-        # ③ OOXML 结构良构 + 版式契约
+        # ② OOXML 结构良构 + 版式契约（2.5.0 起 docx 不入库作基准，
+        #    "成品≡源稿"端到端校验由交付通道组在临时目录执行）
         try:
             z = zipfile.ZipFile(__import__('io').BytesIO(data))
             doc = z.read('word/document.xml').decode('utf-8')
@@ -624,15 +644,13 @@ def check_docx(root):
 
 
 def check_delivery(root):
-    """交付通道契约（2.4.0）：CLI 参数 / PDF 降级不阻断 / --check 反篡改端到端"""
-    import subprocess
-    import shutil
+    """交付通道契约（2.4.0 起）：CLI 参数 / PDF 降级不阻断 / --check 反篡改端到端
+    （2.5.0 起 docx 成品不入库，反篡改端到端在系统临时目录执行，不触碰仓库）"""
     r = []
-    py = sys.executable
-    src = open(os.path.join(root, 'docs', 'md_to_docx.py'), encoding='utf-8').read()
+    src = open(os.path.join(root, 'scripts', 'md_to_docx.py'), encoding='utf-8').read()
     r.append(('CLI 支持 --check', "'--check' in sys.argv" in src))
     r.append(('CLI 支持 --pdf', "'--pdf' in sys.argv" in src))
-    sys.path.insert(0, os.path.join(root, 'docs'))
+    sys.path.insert(0, os.path.join(root, 'scripts'))
     try:
         import md_to_docx as G
         how = G.export_pdf(os.path.join(root, 'examples', '__none__.docx'),
@@ -641,30 +659,34 @@ def check_delivery(root):
     except Exception as e:
         r.append(('PDF 三通道皆无时降级返回 None(不阻断交付)', False, str(e)[:60]))
 
-    rep_path = os.path.join(root, 'docs', 'md_to_docx_report.txt')
-    # 子进程只关心落盘报告，标准输出一律丢弃（避免 Windows GBK 控制台解码异常）
-    devnull = subprocess.DEVNULL
-
-    # 在进程内复刻 `--check` 的判定逻辑（跨进程调用在部分 Windows 控制台下会产生解码噪声，
+    # 在临时目录复刻 `--check` 的判定逻辑（跨进程调用在部分 Windows 控制台下会产生解码噪声；
     # 判定核心是「落盘成品 hash ≡ 源稿派生 hash」，进程内执行等价且更快）
     import md_to_docx as G
+    tmp = os.path.join(REPORT_DIR, 'check_tmp')
+    os.makedirs(tmp, exist_ok=True)
+
+    def gen_all():
+        for f in sorted(glob.glob(os.path.join(root, 'examples', '*.md'))):
+            text = open(f, encoding='utf-8').read()
+            dest = os.path.join(tmp, G.plan_name(text, os.path.basename(f)[:-3]))
+            open(dest, 'wb').write(G.build_docx_bytes(text))
 
     def run_check():
         states = []
         for f in sorted(glob.glob(os.path.join(root, 'examples', '*.md'))):
             text = open(f, encoding='utf-8').read()
             want = hashlib.sha256(G.build_docx_bytes(text)).hexdigest()
-            dest = os.path.join(root, 'examples',
-                                G.plan_name(text, os.path.basename(f)[:-3]))
+            dest = os.path.join(tmp, G.plan_name(text, os.path.basename(f)[:-3]))
             got = hashlib.sha256(open(dest, 'rb').read()).hexdigest() if os.path.exists(dest) else ''
             states.append(got == want)
         return states
 
     try:
+        gen_all()
         states = run_check()
         r.append(('--check 判定：全部成品 ≡ 源稿(SAME)', all(states) and states,
                   '%d/%d' % (sum(states), len(states))))
-        victim = os.path.join(root, 'examples', '认识5_教学设计方案_2课时.docx')
+        victim = os.path.join(tmp, '认识5_教学设计方案_2课时.docx')
         orig = open(victim, 'rb').read()          # 内存备份（不新建文件，避免触发文件监控进程噪声）
         try:
             with open(victim, 'wb') as fh:
@@ -681,31 +703,63 @@ def check_delivery(root):
 
 
 def check_repo(root, ev):
-    """仓库卫生与治理一致性（防文档漂移、防临时件入包）"""
+    """双轨合规与仓库卫生（2.5.0）：技能上传规范（豆包/千问/WorkBuddy）＋ GitHub 仓库规范
+    —— 仓库保留治理文件（GitHub 轨），上传 zip 由 scripts/build_package.py 从仓库产出（技能轨）"""
     r = []
-    temps = [f for f in os.listdir(os.path.join(root, 'docs')) if f.startswith('_')]
-    r.append(('docs/ 无临时调试文件', not temps, ','.join(temps[:3])))
-    gi = open(os.path.join(root, '.gitignore'), encoding='utf-8').read()
-    r.append(('.gitignore 不忽略回归基准 docx', '!examples/*.docx' in gi))
-    rd = open(os.path.join(root, 'README.md'), encoding='utf-8').read()
-    r.append(('README 标题含当前版本', ev in rd.split('\n', 1)[0],
-              rd.split('\n', 1)[0][:40]))
-    cl = open(os.path.join(root, 'CHANGELOG.md'), encoding='utf-8').read()
-    r.append(('CHANGELOG 含当前版本条目', '## [%s]' % ev in cl))
-    # 现行文档（README/CONTRIBUTING/上架清单）不得引用 2.0.0 之前的旧章节号（现为 §0~§6）；
-    # CHANGELOG 属历史记录，其中对旧章节号的回溯性引用是合法的，故排除
+    # ① 技能标准布局（scripts/ + references/ + examples/）
+    r.append(('scripts/ 四脚本齐全(含打包器)', all(os.path.exists(os.path.join(root, 'scripts', f)) for f in
+              ('md_to_docx.py', 'md_to_json.py', 'regression_check.py', 'build_package.py'))))
+    r.append(('references/ 三件齐全', all(os.path.exists(os.path.join(root, 'references', f)) for f in
+              ('output-schema.json', 'format-baseline.md', 'release-checklist.md'))))
+    r.append(('docs/ 自定义目录已移除', not os.path.exists(os.path.join(root, 'docs'))))
+    # ② GitHub 轨：治理文件保留且与当前版本同步
+    gov = [f for f in ('README.md', 'CHANGELOG.md', 'CONTRIBUTING.md', 'LICENSE', '.gitignore')
+           if not os.path.exists(os.path.join(root, f))]
+    r.append(('GitHub 治理文件保留(README/CHANGELOG/CONTRIBUTING/LICENSE/.gitignore)',
+              not gov, '缺' + ','.join(gov) if gov else ''))
+    try:
+        rd = open(os.path.join(root, 'README.md'), encoding='utf-8').read()
+        r.append(('README 标题含当前版本', ev in rd.split('\n', 1)[0],
+                  rd.split('\n', 1)[0][:40]))
+        cl = open(os.path.join(root, 'CHANGELOG.md'), encoding='utf-8').read()
+        r.append(('CHANGELOG 含当前版本条目', '## [%s]' % ev in cl))
+    except Exception as e:
+        r.append(('README/CHANGELOG 可读', False, str(e)[:60]))
+    # ③ 包体卫生：无二进制成品、无运行期报告、无临时调试件（递归，跳过隐藏目录与 dist）
+    bins = glob.glob(os.path.join(root, 'examples', '*.docx')) + \
+        glob.glob(os.path.join(root, 'examples', '*.pdf'))
+    r.append(('examples/ 无二进制成品(docx/pdf)', not bins,
+              ','.join(os.path.basename(b) for b in bins[:3])))
+    junk = []
+    for dp, dn, fn in os.walk(root):
+        dn[:] = [d for d in dn if not d.startswith('.') and d != 'dist']
+        for f in fn:
+            if f.endswith('_report.txt') or f.startswith('_'):
+                junk.append(os.path.relpath(os.path.join(dp, f), root))
+    r.append(('仓库无运行期报告与临时调试件', not junk, ','.join(junk[:3])))
+    # ④ SKILL.md 体积（渐进式披露：主文件 ≤500 行）
+    n_lines = len(open(os.path.join(root, 'SKILL.md'), encoding='utf-8').read().splitlines())
+    r.append(('SKILL.md 行数≤500(渐进式披露)', n_lines <= 500, '%d行' % n_lines))
+    # ⑤ .gitignore：覆盖缓存/工作目录/打包产物
+    gi_p = os.path.join(root, '.gitignore')
+    gi = open(gi_p, encoding='utf-8').read() if os.path.exists(gi_p) else ''
+    r.append(('.gitignore 覆盖缓存/工作目录/dist',
+              '__pycache__/' in gi and '.workbuddy/' in gi and 'dist/' in gi))
+    # ⑥ 现行文档不得引用 2.0.0 之前的旧章节号（现为 §0~§6）；CHANGELOG 属历史记录，回溯性引用合法，排除；
+    #    回归项数随版本增长，硬编码必然过期 → 一律改为引用报告
     stale_sec, stale_num = [], []
-    for f in ('README.md', 'CONTRIBUTING.md', 'docs/release-checklist.md'):
-        p = os.path.join(root, f)
+    cand = [os.path.join(root, 'SKILL.md'), os.path.join(root, 'README.md'),
+            os.path.join(root, 'CONTRIBUTING.md')]
+    cand += glob.glob(os.path.join(root, 'references', '*.md'))
+    for p in cand:
         if not os.path.exists(p):
             continue
         t = open(p, encoding='utf-8').read()
         bad = [s for s in re.findall(r'§(\d+)', t) if int(s) > 6]
         if bad:
-            stale_sec.append('%s:%s' % (f, ','.join(bad)))
-        # 回归项数会随版本增长，硬编码必然过期 → 一律改为引用报告
+            stale_sec.append('%s:%s' % (os.path.basename(p), ','.join(bad)))
         if re.search(r'(?<![\d.])\d{2,3}\s*/\s*\d{2,3}(?![\d.])', t):
-            stale_num.append(f)
+            stale_num.append(os.path.basename(p))
     r.append(('现行文档无已废弃章节号(>§6)', not stale_sec, ';'.join(stale_sec)))
     r.append(('治理文件不硬编码回归项数(改引用报告)', not stale_num, ','.join(stale_num)))
     return r
@@ -727,7 +781,7 @@ def main():
             ok += 1 if passed else 0
             out.append('  [%s] %s %s' % ('PASS' if passed else 'FAIL', label, note))
     out.append('')
-    out.append('=== 结构化输出契约 docs/output-schema.json ===')
+    out.append('=== 结构化输出契约 references/output-schema.json ===')
     for item in check_schema(ROOT, EV):
         total += 1
         ok += 1 if item[1] else 0
@@ -757,7 +811,7 @@ def main():
         ok += 1 if item[1] else 0
         out.append('  [%s] %s %s' % ('PASS' if item[1] else 'FAIL', item[0], item[2] if len(item) > 2 else ''))
     out.append('')
-    out.append('=== 仓库卫生与治理一致性 ===')
+    out.append('=== 双轨合规与仓库卫生 ===')
     for item in check_repo(ROOT, EV):
         total += 1
         ok += 1 if item[1] else 0
@@ -781,7 +835,7 @@ def main():
     out.append('')
     rate = ok * 100.0 / total if total else 0
     out.append('通过率：%d/%d = %.1f%%' % (ok, total, rate))
-    open(os.path.join(ROOT, 'docs', 'regression_report.txt'), 'w', encoding='utf-8').write('\n'.join(out))
+    open(report_path('regression_report.txt'), 'w', encoding='utf-8').write('\n'.join(out))
 
 
 if __name__ == '__main__':
@@ -789,5 +843,5 @@ if __name__ == '__main__':
         main()
     except Exception as e:
         import traceback
-        open(os.path.join(ROOT, 'docs', 'regression_report.txt'), 'w',
+        open(report_path('regression_report.txt'), 'w',
              encoding='utf-8').write('ERROR:\n' + traceback.format_exc())

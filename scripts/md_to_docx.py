@@ -14,10 +14,11 @@
   4. 忠实 Single Source：docx 与 JSON 同源于 md，禁止手改 docx。
 
 用法：
-  python docs/md_to_docx.py                 # 输出到 examples/
-  python docs/md_to_docx.py <输出目录>      # 指定输出目录
-  python docs/md_to_docx.py <输出目录> --check   # 校验已交付 docx 与源稿是否一致
-输出：<课题>_教学设计方案_N课时.docx + docs/md_to_docx_report.txt
+  python scripts/md_to_docx.py                 # 输出到 examples/
+  python scripts/md_to_docx.py <输出目录>      # 指定输出目录（缺失自动创建）
+  python scripts/md_to_docx.py <输出目录> --check   # 校验该目录已交付 docx 与源稿是否一致
+输出：<课题>_教学设计方案_N课时.docx
+报告：写入系统临时目录 %TEMP%/peizhi_shuangmai/（不进仓库/技能包，避免运行期产物混入）。
 """
 import re
 import os
@@ -27,8 +28,17 @@ import json
 import zipfile
 import hashlib
 import datetime
+import tempfile
 
-ENGINE_VERSION = '2.4.0'
+ENGINE_VERSION = '2.5.0'
+
+REPORT_DIR = os.path.join(tempfile.gettempdir(), 'peizhi_shuangmai')
+
+
+def report_path(name):
+    """运行期报告一律落系统临时目录（包内不产 *_report.txt）"""
+    os.makedirs(REPORT_DIR, exist_ok=True)
+    return os.path.join(REPORT_DIR, name)
 
 W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 CT = 'http://schemas.openxmlformats.org/package/2006/content-types'
@@ -527,6 +537,8 @@ def main():
     check = '--check' in sys.argv
     want_pdf = '--pdf' in sys.argv
     outdir = args[0] if args else os.path.join(root, 'examples')
+    if not check:
+        os.makedirs(outdir, exist_ok=True)   # 成品目录可任意指定，缺失即建（2.5.0 修复）
     rep = []
     okeds, fails = 0, 0
     for f in sorted(glob.glob(os.path.join(root, 'examples', '*.md'))):
@@ -558,7 +570,7 @@ def main():
     head = ['生成器版本 %s（%s）' % (ENGINE_VERSION, datetime.date.today().isoformat()),
             '模式：%s' % ('一致性校验' if check else '生成'),
             '结果：成功 %d / 失败 %d' % (okeds, fails), '']
-    open(os.path.join(root, 'docs', 'md_to_docx_report.txt'), 'w',
+    open(report_path('md_to_docx_report.txt'), 'w',
          encoding='utf-8').write('\n'.join(head + rep))
 
 
@@ -567,6 +579,5 @@ if __name__ == '__main__':
         main()
     except Exception:
         import traceback
-        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        open(os.path.join(root, 'docs', 'md_to_docx_report.txt'), 'w',
+        open(report_path('md_to_docx_report.txt'), 'w',
              encoding='utf-8').write('ERROR:\n' + traceback.format_exc())
