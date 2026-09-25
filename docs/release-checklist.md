@@ -6,16 +6,19 @@
 
 ## 一、仓库结构与文件完整性
 
-- [ ] 仓库根目录存在 `SKILL.md`（引擎主体，front-matter 完整：name / display_name / version / author / description / tags / compatibility / license / requires）
+- [ ] 仓库根目录存在 `SKILL.md`（引擎主体，front-matter 完整：`name` / `display_name` / `display_name_en` / `version`(SemVer 三段) / `author` / `description_zh` / `description_en` / `tags` / `compatibility` / `license` / `requires`；含冒号的字段值须加引号）
 - [ ] 以下开源配套文件齐全且内容与当前版本一致：
   - [ ] `README.md`（项目简介 / 特性 / 快速开始 / 安装 / 仓库结构 / 隐私说明 / 致谢 / 许可证 / 版本与兼容性）
   - [ ] `LICENSE`（MIT 主许可 ＋ 附加条款：红区护栏不可移除 / 署名保留 / 商业用途限制 / 隐私责任边界 / 方法论文献声明）
   - [ ] `CHANGELOG.md`（日期 / 版本号 / 变更类型 / 变更说明；与 SKILL.md front-matter 版本号同步）
-  - [ ] `examples/`（至少 1 篇实跑教案；`好吃的水果_教学设计方案.md` 为验收基准）
-  - [ ] `docs/SKILL_v1.1_archived.md`（V1.1 历史存档，供回滚与旧章节号检索）
+  - [ ] `examples/`（≥2 篇多课时实跑教案：`认识5_教学设计方案_2课时.md`、`好吃的水果_教学设计方案_3课时.md` 为回归基准；每篇可派生出 `<课题>_结构化输出样例.json`）
+  - [ ] `docs/output-schema.json`（结构化输出契约，JSON Schema draft 2020-12；`anchors` 为多锚点数组）
+  - [ ] `docs/md_to_json.py` + `docs/md_to_json_report.txt`（md→JSON 唯一派生通道，禁止手工编写 JSON）
+  - [ ] `docs/md_to_docx.py` + `docs/md_to_docx_report.txt`（md→Word 唯一执行通道，零依赖/字节幂等/红区拒绝落盘）
+  - [ ] `docs/regression_check.py` + `docs/regression_report.txt`（回归校验须 100% 通过，项数以报告末尾通过率为准）
   - [ ] `CONTRIBUTING.md`（贡献边界 / 流程 / 回归测试最小集 / 红区红线 / ISSUE 模板）
   - [ ] `docs/release-checklist.md`（本文件）
-  - [ ] `.gitignore`（默认排除 Word/PDF 成品与工作中间产物）
+  - [ ] `.gitignore`（默认排除会话产出的 Word/PDF 与工作中间产物；但 `!examples/*.docx` 白名单保留回归基准成品）
 
 ## 二、README 要求
 
@@ -56,11 +59,16 @@
 - [ ] 职务作品书面确认：作者确认本作品非职务作品 / 已获单位授权（按实际情况勾选并留存书面确认）
 - [ ] 商业用途授权边界已写入 LICENSE，作者联系方式（如需商务授权）已在 README 或 ISSUE 模板可寻址处给出
 
-## 八、回归测试最小集（CONTRIBUTING §3，发布前必跑）
+## 八、回归测试最小集（CONTRIBUTING 第 3 节，发布前必跑）
 
-- [ ] 示例课题实跑 1 篇，产出一致（环节数、五列表〔含 BOPPPS 步别、≥1 个探究活动、时间合计=课堂时长〕、目标矩阵、LOS 表齐全）
+- [ ] 示例教案实跑：多课时（2~3 课时）各 1 篇，产出一致（每课时五列表〔BOPPPS 步别、≥1 探究活动、时间合计=该课时时长〕、分课时目标矩阵、LOS 表逐课时成对列且全生覆盖）
+- [ ] **跨课时行为干预**：支持卡六要素齐全（触发信号/前因调整/替代行为/强化计划/危机处置/全员一致要求）、强化计划逐课时削弱（连续→FR2→变动＋社会性）、晋级降级阈值含 80% 判据、危机处置四条红线（禁体罚、禁惩罚性隔离、禁强制进食、禁当众批评）；出现 N 的学生不计学业判据
+- [ ] **无障碍基线**：字号下限（正文≥12pt、表格≥9pt、图卡标签≥24pt、关键句≥36pt）、对比度 ≥7:1 且不低于 4.5:1、色彩不得仅依赖颜色区分、学生可视材料用黑体无衬线
+- [ ] **Single Source 派生**：改动教案后已重跑 `python docs/md_to_json.py`，且回归中"落盘样例≡派生结果"PASS（禁止手工编辑 JSON）
+- [ ] **结构化输出契约**：`examples/*结构化输出样例.json` 合 `docs/output-schema.json`（`anchors` 每条三级齐全），且 `schema_version` 与 SKILL.md `version` 一致
 - [ ] 附件识别回归：内容提取卡七字段齐全（含红区拦截记录）、回填环节 0/1 生效、红区拦截生效
-- [ ] Word+PDF 双格式生成成功，§13.1 格式基线核验全过
+- [ ] **Word 成品**：已用 `python docs/md_to_docx.py` 生成（禁手工排版），落盘 docx ≡ 源稿派生且字节幂等；结构校验全过（封面独立节无页码、页脚 PAGE/SECTIONPAGES、A4 与页边距、表头跨页重复、列宽合计=版心、五列表列宽比、占位符保留、零引擎元信息、红区干净）；`--pdf` 三通道皆无时已给出降级指引
+- [ ] `python docs/regression_check.py` 全项 PASS，报告已更新至 `docs/regression_report.txt`；含引擎自身防漂移校验（frontmatter 字段、SemVer、版号多处一致、五条铁律表述、外部引用存在性）、md→JSON 派生一致性、Word 成品结构与反篡改、仓库卫生与治理一致性
 - [ ] 全库扫描无真实姓名/照片/病历（红区零输入）
 
 ---
@@ -80,7 +88,7 @@
 | 合规确认 | ☐ 待作者确认 | 职务作品书面确认需作者本人签署 |
 | 回归测试最小集① 示例实跑 | ☑ 通过 | 《好吃的水果》实跑教案结构齐全（BOPPPS 六步、探究活动、35′ 合计、目标矩阵、LOS 表）；新增《5的认识》验收基准 |
 | 回归测试最小集② 附件识别 | ☐ 需实跑环境 | 依赖平台附件上传/OCR 能力，上架前在目标平台实跑 1 次 |
-| 回归测试最小集③ Word+PDF 双格式 | ☐ 需实跑环境 | 上架前在文件系统环境实跑 1 次并过 §13.1 核验 |
+| 回归测试最小集③ Word+PDF 双格式 | ☐ 需实跑环境 | 上架前在文件系统环境实跑 1 次并过 §4 核验 |
 | 回归测试最小集④ 全库红区扫描 | ☑ 通过 | 见上 |
 
-> 说明：②③ 两项为运行态回归（依赖平台 OCR 与本地文档生成环境），本次开源准备已完成静态核对（SKILL.md §0.5/§13.1 定义完整、示例教案双格式源稿结构符合规范），正式发布前须在实跑环境补跑。
+> 说明：②③ 两项为运行态回归（依赖平台 OCR 与本地文档生成环境），本次开源准备已完成静态核对（环节 0.5 与 SKILL.md §4 定义完整、示例教案双格式源稿结构符合规范），正式发布前须在实跑环境补跑。

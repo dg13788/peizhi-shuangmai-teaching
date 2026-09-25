@@ -1,0 +1,242 @@
+引擎版本：2.4.0
+=== 好吃的水果_教学设计方案_3课时.md ===
+  [PASS] 封面两行标题相邻 
+  [PASS] 表格均有表头行 
+  [PASS] 表格内无重复分隔行 
+  [PASS] 表格首行非数据行(表头不缺失) []
+  [PASS] 五列表表头严格为"教学环节" []
+  [PASS] 五列表数量=课时数N 3/3
+  [PASS] 第1课时 BOPPPS 六步齐全 
+  [PASS] 第1课时 时间合计=35′ 35
+  [PASS] 第1课时 含≥1探究活动 
+  [PASS] 第2课时 BOPPPS 六步齐全 
+  [PASS] 第2课时 时间合计=35′ 35
+  [PASS] 第2课时 含≥1探究活动 
+  [PASS] 第3课时 BOPPPS 六步齐全 
+  [PASS] 第3课时 时间合计=35′ 35
+  [PASS] 第3课时 含≥1探究活动 
+  [PASS] LOS表逐课时成对列(1+2N+1=8) 实8列
+  [PASS] LOS表全生覆盖(12人) 实12人
+  [PASS] 材料清单含☐勾选框 
+  [PASS] 安全替代表三列(含风险列) 
+  [PASS] 板书为版式代码块 
+  [PASS] 归档视图含课标锚点三级 
+  [PASS] 表号连续无跳号 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+  [PASS] 章节编号连续 一/二/三/四/五/六/七/八/九/十/十一/十二/十三/十四/十五/十六/十七
+  [PASS] 占位符{{}}保留 
+  [PASS] 红区扫描干净 
+  [PASS] 跨课时行为支持卡章节存在 
+  [PASS] 行为支持卡六要素齐全 
+  [PASS] 强化计划逐课时削弱 
+  [PASS] 替代行为标注已先教先练 
+  [PASS] 晋级降级阈值含80%判据 
+  [PASS] 危机处置禁忌齐全(4条) 
+  [PASS] 感官调节章节存在 
+  [PASS] 感官五维度齐全 
+  [PASS] 感官调节表四列(维度/触发/前置/降刺激通道) 
+  [PASS] 降刺激通道非惩罚性(无"隔离"作唯一通道) 
+  [PASS] IEP累计追踪章节存在 
+  [PASS] IEP追踪表含年度长期目标列 
+  [PASS] IEP追踪表逐课时达成列==N 实3列/N=3
+  [PASS] IEP追踪表全生覆盖(12人) 实12人
+  [PASS] IEP累计口径含成功率算式 
+  [PASS] 排版无障碍执行说明章节存在 
+  [PASS] 无障碍基线要素齐全 
+=== 认识5_教学设计方案_2课时.md ===
+  [PASS] 封面两行标题相邻 
+  [PASS] 表格均有表头行 
+  [PASS] 表格内无重复分隔行 
+  [PASS] 表格首行非数据行(表头不缺失) []
+  [PASS] 五列表表头严格为"教学环节" []
+  [PASS] 五列表数量=课时数N 2/2
+  [PASS] 第1课时 BOPPPS 六步齐全 
+  [PASS] 第1课时 时间合计=35′ 35
+  [PASS] 第1课时 含≥1探究活动 
+  [PASS] 第2课时 BOPPPS 六步齐全 
+  [PASS] 第2课时 时间合计=35′ 35
+  [PASS] 第2课时 含≥1探究活动 
+  [PASS] LOS表逐课时成对列(1+2N+1=6) 实6列
+  [PASS] LOS表全生覆盖(12人) 实12人
+  [PASS] 材料清单含☐勾选框 
+  [PASS] 安全替代表三列(含风险列) 
+  [PASS] 板书为版式代码块 
+  [PASS] 归档视图含课标锚点三级 
+  [PASS] 表号连续无跳号 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+  [PASS] 章节编号连续 一/二/三/四/五/六/七/八/九/十/十一/十二/十三/十四/十五/十六
+  [PASS] 占位符{{}}保留 
+  [PASS] 红区扫描干净 
+  [PASS] 跨课时行为支持卡章节存在 
+  [PASS] 行为支持卡六要素齐全 
+  [PASS] 强化计划逐课时削弱 
+  [PASS] 替代行为标注已先教先练 
+  [PASS] 晋级降级阈值含80%判据 
+  [PASS] 危机处置禁忌齐全(4条) 
+  [PASS] 感官调节章节存在 
+  [PASS] 感官五维度齐全 
+  [PASS] 感官调节表四列(维度/触发/前置/降刺激通道) 
+  [PASS] 降刺激通道非惩罚性(无"隔离"作唯一通道) 
+  [PASS] IEP累计追踪章节存在 
+  [PASS] IEP追踪表含年度长期目标列 
+  [PASS] IEP追踪表逐课时达成列==N 实2列/N=2
+  [PASS] IEP追踪表全生覆盖(12人) 实12人
+  [PASS] IEP累计口径含成功率算式 
+  [PASS] 排版无障碍执行说明章节存在 
+  [PASS] 无障碍基线要素齐全 
+
+=== 结构化输出契约 docs/output-schema.json ===
+  [PASS] Schema 文件为合法 JSON 
+  [PASS] Schema 顶层 required 齐全 12
+  [PASS] Schema 含 BOPPPS step 枚举 ['B', 'O', 'P前', 'P参', 'P后', 'S']
+  [PASS] Schema anchors 为多锚点数组 
+  [PASS] Schema 感官调节四字段 ['维度', '触发信号', '前置安排', '降刺激通道']
+  [PASS] Schema 感官调节≥5维度 
+  [PASS] Schema IEP 追踪五字段 ['学生代号', '年度长期目标', '本课短期目标', '分课时达成', '累计口径']
+  [PASS] Schema 顶层含 sensory_regulation/iep_tracking 
+  [PASS] Schema 行为支持卡六要素 6
+  [PASS] JSON 样例为合法 JSON 
+  [PASS] JSON schema_version 符合引擎版本 JSON=2.4.0 SKILL=2.4.0
+  [PASS] JSON 顶层字段无缺失 
+  [PASS] SKILL.md §6 顶层字段声明 ≡ Schema required 多 缺
+  [PASS] JSON 多锚点且每条三级齐全 3条
+  [PASS] JSON lessons 数 == 课时数N 3/3
+  [PASS] JSON 每课时 BOPPPS 六步齐全 
+  [PASS] JSON 每课时分钟合计==35 L1=35 L2=35 L3=35
+  [PASS] JSON 每课时目标矩阵≥9格 
+  [PASS] JSON 每课时探究活动≥1 
+  [PASS] JSON LOS 逐生逐课时成对 12人
+  [PASS] JSON 学生一律代号(红区合规) 
+  [PASS] JSON 行为支持卡六要素 
+  [PASS] JSON 含晋级降级阈值规则 
+  [PASS] JSON 泛化三场景齐全 
+  [PASS] JSON 安全替代表三字段 
+  [PASS] JSON 隐私声明 red_zone_free 
+  [PASS] JSON 感官五维度齐全 听觉/视觉/前庭与座位/口欲与过敏/触觉与材料
+  [PASS] JSON 感官每条四字段非空 
+  [PASS] JSON IEP 追踪全生覆盖(12人) 实12人
+  [PASS] JSON IEP 追踪逐课时达成列==N 
+  [PASS] JSON IEP 追踪字段非空且代号合规 
+
+=== 引擎自身 SKILL.md ===
+  [PASS] SKILL.md 上架字段齐全 
+  [PASS] SKILL.md version 为 SemVer 三段 2.4.0
+  [PASS] description_en 引号闭合(YAML安全) 
+  [PASS] JSON 样例版本与引擎一致 JSON=2.4.0 SKILL=2.4.0
+  [PASS] SKILL.md 正文标题含版本号 V2.4.0
+  [PASS] 五条铁律表述保留 
+  [PASS] 行为干预机制保留 
+  [PASS] 无障碍基线保留 
+  [PASS] SKILL.md 外部引用均存在 
+
+=== md→JSON 派生一致性（Single Source） ===
+  [PASS] 派生器 ENGINE_VERSION 与引擎一致 M=2.4.0 SKILL=2.4.0
+  [PASS] Word 生成器版本与引擎一致 D=2.4.0 SKILL=2.4.0
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 派生 lessons 数==N 3/3
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 派生每课时时间合计==35 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 派生 LOS 逐课时成对 12人
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 派生目标矩阵≥9格 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 派生探究活动≥1/课时 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 派生分层作业三层齐全 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 派生锚点非空且三级 3条
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 派生行为支持卡六要素 6
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 派生泛化三场景 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 派生安全替代表非空 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 派生材料清单非空 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 落盘样例≡派生结果(防漂移) 
+  [PASS] [认识5_教学设计方案_2课时.md] 派生 lessons 数==N 2/2
+  [PASS] [认识5_教学设计方案_2课时.md] 派生每课时时间合计==35 
+  [PASS] [认识5_教学设计方案_2课时.md] 派生 LOS 逐课时成对 12人
+  [PASS] [认识5_教学设计方案_2课时.md] 派生目标矩阵≥9格 
+  [PASS] [认识5_教学设计方案_2课时.md] 派生探究活动≥1/课时 
+  [PASS] [认识5_教学设计方案_2课时.md] 派生分层作业三层齐全 
+  [PASS] [认识5_教学设计方案_2课时.md] 派生锚点非空且三级 4条
+  [PASS] [认识5_教学设计方案_2课时.md] 派生行为支持卡六要素 6
+  [PASS] [认识5_教学设计方案_2课时.md] 派生泛化三场景 
+  [PASS] [认识5_教学设计方案_2课时.md] 派生安全替代表非空 
+  [PASS] [认识5_教学设计方案_2课时.md] 派生材料清单非空 
+  [PASS] [认识5_教学设计方案_2课时.md] 落盘样例≡派生结果(防漂移) 
+
+=== Word 成品 md→docx（结构/版式/幂等/防漂移） ===
+  [PASS] 可导入 md_to_docx 生成器 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] docx 生成成功 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] docx 字节级幂等 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 落盘 docx ≡ 源稿派生(防漂移) 好吃的水果_教学设计方案_3课时.docx
+  [PASS] [好吃的水果_教学设计方案_3课时.md] document.xml 良构 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 封面独立成节(sectPr=2) 实2
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 封面节无页脚引用(封面不出现页码) 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 正文节含页脚且正文起始页码=1 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 页脚为 PAGE/SECTIONPAGES 字段 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 页面 A4 与页边距 2.54/3.18cm 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 默认字体宋体/TimesNewRoman/小四 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 一级标题黑体三号加粗 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 章节标题用 Heading 样式(keepNext 禁标题孤行) Heading2,Heading3
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 表格宽度合计=版心且不溢出 []
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 表格表头跨页重复 19/19
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 五列表列宽比 14/26/20/24/16 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 含 docProps/core.xml 且类型与关系齐全 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] core.xml 零引擎元信息 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 正文 1.5 倍行距 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 正文段首缩进 2 字符 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 表格字号≥小五(9pt) 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 表头加粗居中 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 底纹为中性浅色(色彩不作唯一编码) 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 封面标题二号居中 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] sectPr 元素序(footerRef→pgSz→pgMar→pgNumType→cols→docGrid) 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] tblPr 元素序(tblW→jc→borders→layout→cellMar) 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] trPr 元素序(cantSplit→tblHeader) 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] pPr 中 shd 在 spacing/ind/jc 之前 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 占位符{{}}在成品中保留 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 成品零引擎元信息 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 成品红区扫描干净 
+  [PASS] [好吃的水果_教学设计方案_3课时.md] python-docx 可读且结构完整 段129/表19
+  [PASS] [好吃的水果_教学设计方案_3课时.md] 外部读取后占位符与五列表完好 
+  [PASS] [认识5_教学设计方案_2课时.md] docx 生成成功 
+  [PASS] [认识5_教学设计方案_2课时.md] docx 字节级幂等 
+  [PASS] [认识5_教学设计方案_2课时.md] 落盘 docx ≡ 源稿派生(防漂移) 认识5_教学设计方案_2课时.docx
+  [PASS] [认识5_教学设计方案_2课时.md] document.xml 良构 
+  [PASS] [认识5_教学设计方案_2课时.md] 封面独立成节(sectPr=2) 实2
+  [PASS] [认识5_教学设计方案_2课时.md] 封面节无页脚引用(封面不出现页码) 
+  [PASS] [认识5_教学设计方案_2课时.md] 正文节含页脚且正文起始页码=1 
+  [PASS] [认识5_教学设计方案_2课时.md] 页脚为 PAGE/SECTIONPAGES 字段 
+  [PASS] [认识5_教学设计方案_2课时.md] 页面 A4 与页边距 2.54/3.18cm 
+  [PASS] [认识5_教学设计方案_2课时.md] 默认字体宋体/TimesNewRoman/小四 
+  [PASS] [认识5_教学设计方案_2课时.md] 一级标题黑体三号加粗 
+  [PASS] [认识5_教学设计方案_2课时.md] 章节标题用 Heading 样式(keepNext 禁标题孤行) Heading2,Heading3
+  [PASS] [认识5_教学设计方案_2课时.md] 表格宽度合计=版心且不溢出 []
+  [PASS] [认识5_教学设计方案_2课时.md] 表格表头跨页重复 17/17
+  [PASS] [认识5_教学设计方案_2课时.md] 五列表列宽比 14/26/20/24/16 
+  [PASS] [认识5_教学设计方案_2课时.md] 含 docProps/core.xml 且类型与关系齐全 
+  [PASS] [认识5_教学设计方案_2课时.md] core.xml 零引擎元信息 
+  [PASS] [认识5_教学设计方案_2课时.md] 正文 1.5 倍行距 
+  [PASS] [认识5_教学设计方案_2课时.md] 正文段首缩进 2 字符 
+  [PASS] [认识5_教学设计方案_2课时.md] 表格字号≥小五(9pt) 
+  [PASS] [认识5_教学设计方案_2课时.md] 表头加粗居中 
+  [PASS] [认识5_教学设计方案_2课时.md] 底纹为中性浅色(色彩不作唯一编码) 
+  [PASS] [认识5_教学设计方案_2课时.md] 封面标题二号居中 
+  [PASS] [认识5_教学设计方案_2课时.md] sectPr 元素序(footerRef→pgSz→pgMar→pgNumType→cols→docGrid) 
+  [PASS] [认识5_教学设计方案_2课时.md] tblPr 元素序(tblW→jc→borders→layout→cellMar) 
+  [PASS] [认识5_教学设计方案_2课时.md] trPr 元素序(cantSplit→tblHeader) 
+  [PASS] [认识5_教学设计方案_2课时.md] pPr 中 shd 在 spacing/ind/jc 之前 
+  [PASS] [认识5_教学设计方案_2课时.md] 占位符{{}}在成品中保留 
+  [PASS] [认识5_教学设计方案_2课时.md] 成品零引擎元信息 
+  [PASS] [认识5_教学设计方案_2课时.md] 成品红区扫描干净 
+  [PASS] [认识5_教学设计方案_2课时.md] python-docx 可读且结构完整 段122/表17
+  [PASS] [认识5_教学设计方案_2课时.md] 外部读取后占位符与五列表完好 
+
+=== 交付通道契约 md→docx CLI / PDF 降级 / 反篡改 ===
+  [PASS] CLI 支持 --check 
+  [PASS] CLI 支持 --pdf 
+  [PASS] PDF 三通道皆无时降级返回 None(不阻断交付) None
+  [PASS] --check 判定：全部成品 ≡ 源稿(SAME) 2/2
+  [PASS] --check 判定：能识别被改动的成品(DIFF) 
+  [PASS] --check 判定：还原后重新 SAME 
+
+=== 仓库卫生与治理一致性 ===
+  [PASS] docs/ 无临时调试文件 
+  [PASS] .gitignore 不忽略回归基准 docx 
+  [PASS] README 标题含当前版本 # 培智·双脉教学引擎（特教 IEP 备课 Skill）V2.4.0
+  [PASS] CHANGELOG 含当前版本条目 
+  [PASS] 现行文档无已废弃章节号(>§6) 
+  [PASS] 治理文件不硬编码回归项数(改引用报告) 
+
+
+通过率：224/224 = 100.0%

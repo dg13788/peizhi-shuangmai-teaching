@@ -1,9 +1,11 @@
 # —— 培智·双脉教学引擎 · Git 忽略规则 ——
-# 依据 SKILL.md §9（示例与回归测试约定）与 §13（交付包清单）制定
+# 依据 SKILL.md §6（治理与外部文件）与 docs/release-checklist.md 制定
 
-# 1. 交付成品（Word/PDF 默认不入库；如需归档用 git add -f）
+# 1. 交付成品（会话产出的 Word/PDF 默认不入库；如需归档用 git add -f）
 *.docx
 *.pdf
+# 例外：examples/ 下的 docx 是**回归基准产物**（回归断言"落盘 docx ≡ 源稿派生"依赖它），必须入库
+!examples/*.docx
 
 # 2. 会话中间产物（锚定单 / 内容提取卡 / 设计底稿）
 锚定单_*.md

@@ -1,0 +1,397 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://peizhi-shuangmai-teaching.local/schemas/output-schema.json",
+  "title": "培智·双脉教学引擎 结构化教案输出契约",
+  "description": "机器可读教案输出契约（V2.4.0）。硬约束：①逐课时 sum(lessons[].timeline[].minutes) == meta.单课时时长分钟；②len(lessons) == meta.课时数N；③los_table 每生 records 逐课时成对且长度 == meta.课时数N；④support.behavior_card 六要素齐全；⑤学生一律代号，privacy.red_zone_free 必须为 true。本文件不由服务端强校验，由 docs/regression_check.py 执行等价断言。",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "meta",
+    "anchors",
+    "lessons",
+    "los_table",
+    "support",
+    "generalization",
+    "safety_alternatives",
+    "sensory_regulation",
+    "iep_tracking",
+    "materials",
+    "privacy"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "2.4.0" },
+
+    "meta": {
+      "type": "object",
+      "title": "教案头",
+      "required": ["课题", "学科", "学段年级", "班级", "课时数N", "单课时时长分钟", "课型"],
+      "properties": {
+        "课题": { "type": "string" },
+        "学科": { "type": "string" },
+        "学段年级": { "type": "string" },
+        "班级": { "type": "string" },
+        "授课日期": { "type": "string", "description": "YYYY-MM-DD，未定则保留占位符 {{}}" },
+        "执教者": { "type": "string" },
+        "课时数N": { "type": "integer", "minimum": 1, "maximum": 6 },
+        "单课时时长分钟": { "type": "integer", "enum": [25, 35, 40] },
+        "课型": { "type": "string" },
+        "教学方法": { "type": "string" },
+        "教材": {
+          "type": "object",
+          "required": ["版本", "册次", "单元", "课"],
+          "properties": {
+            "版本": { "type": "string" },
+            "册次": { "type": "string" },
+            "单元": { "type": "string" },
+            "课": { "type": "string" },
+            "确证状态": { "type": "string", "enum": ["已确证", "未确证"] }
+          }
+        }
+      }
+    },
+
+    "anchors": {
+      "type": "array",
+      "title": "课标锚点三级（多锚点）",
+      "description": "一课常挂多个领域条目（如识字与写字／阅读／倾听与说话），故为数组。每条必须到「板块 · 条目 · 具体表述」三级，禁只写学段；四视图与结构化输出必须一致。",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["板块", "条目", "表述"],
+        "properties": {
+          "板块": { "type": "string" },
+          "条目": { "type": "string" },
+          "表述": { "type": "string" }
+        }
+      }
+    },
+
+    "lessons": {
+      "type": "array",
+      "title": "分课时设计",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "required": [
+          "课时序号",
+          "主题",
+          "核心目标",
+          "生活化落点",
+          "timeline",
+          "objectives_matrix",
+          "inquiry_activities",
+          "board_layout",
+          "分层作业"
+        ],
+        "properties": {
+          "课时序号": { "type": "integer", "minimum": 1 },
+          "主题": { "type": "string" },
+          "核心目标": { "type": "string" },
+          "生活化落点": { "type": "string" },
+
+          "timeline": {
+            "type": "array",
+            "title": "时间轴（BOPPPS 六步）",
+            "description": "每课时须含 B/O/P前/P参/P后/S 六步，分钟数为整数，合计恒等于 meta.单课时时长分钟。",
+            "minItems": 6,
+            "items": {
+              "type": "object",
+              "required": ["step", "环节名", "分钟"],
+              "properties": {
+                "step": {
+                  "type": "string",
+                  "enum": ["B", "O", "P前", "P参", "P后", "S"]
+                },
+                "环节名": { "type": "string" },
+                "分钟": { "type": "integer", "minimum": 1 },
+                "分钟合计校验": {
+                  "type": "integer",
+                  "description": "由生成方回填的本课时分钟合计，须 == meta.单课时时长分钟"
+                }
+              }
+            }
+          },
+
+          "objectives_matrix": {
+            "type": "array",
+            "title": "三维×三层目标矩阵",
+            "description": "3 维度 × 3 层 = 9 格；每格须含可观察动作与可测判据。",
+            "minItems": 9,
+            "items": {
+              "type": "object",
+              "required": ["维度", "层", "目标", "评测判据"],
+              "properties": {
+                "维度": {
+                  "type": "string",
+                  "enum": ["知识与技能", "过程与方法", "情感态度价值观"]
+                },
+                "层": { "type": "string", "enum": ["A", "B", "C"] },
+                "目标": { "type": "string", "description": "可观察动作＋可测条件" },
+                "评测判据": { "type": "string" },
+                "对应IEP长目标": { "type": "string" }
+              }
+            }
+          },
+
+          "inquiry_activities": {
+            "type": "array",
+            "title": "探究活动（每课时≥1）",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["名称", "步别", "分钟", "版本", "材料"],
+              "properties": {
+                "名称": { "type": "string" },
+                "步别": { "type": "string", "enum": ["P参"] },
+                "分钟": { "type": "integer", "minimum": 1 },
+                "版本": {
+                  "type": "object",
+                  "required": ["A", "B", "C"],
+                  "properties": {
+                    "A": { "type": "string" },
+                    "B": { "type": "string" },
+                    "C": { "type": "string" }
+                  }
+                },
+                "材料": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+              }
+            }
+          },
+
+          "assessment": {
+            "type": "object",
+            "title": "课时评价（前后测对齐同一批目标格）",
+            "properties": {
+              "前测方式": { "type": "string" },
+              "后测方式": { "type": "string" },
+              "对齐目标格": { "type": "array", "items": { "type": "string" } },
+              "参与性判据": {
+                "type": "object",
+                "description": "出现 N（无参与）学生时启用：注视时长/触碰次数/在场时长",
+                "properties": {
+                  "注视时长秒": { "type": "integer" },
+                  "触碰次数": { "type": "integer" },
+                  "在场时长分钟": { "type": "integer" }
+                }
+              }
+            }
+          },
+
+          "board_layout": {
+            "type": "string",
+            "description": "板书版式（多行文本），须标注课题字号≥36pt、图卡标签≥24pt"
+          },
+
+          "分层作业": {
+            "type": "object",
+            "required": ["A", "B", "C"],
+            "properties": {
+              "A": { "type": "string" },
+              "B": { "type": "string" },
+              "C": { "type": "string" },
+              "家长配合": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+
+    "los_table": {
+      "type": "array",
+      "title": "LOS 变化记录表（逐生逐课时成对）",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["学生代号", "records"],
+        "properties": {
+          "学生代号": {
+            "type": "string",
+            "pattern": "^生\\d+$",
+            "description": "红区零命名，一律代号"
+          },
+          "records": {
+            "type": "array",
+            "description": "长度须 == meta.课时数N，逐课时 {起始LOS, 达成LOS} 成对",
+            "items": {
+              "type": "object",
+              "required": ["课时", "起始LOS", "达成LOS"],
+              "properties": {
+                "课时": { "type": "integer", "minimum": 1 },
+                "起始LOS": {
+                  "type": "string",
+                  "enum": ["I", "V", "G", "P", "F", "N"]
+                },
+                "达成LOS": {
+                  "type": "string",
+                  "enum": ["I", "V", "G", "P", "F", "N", "待回填"]
+                },
+                "备注": { "type": "string", "description": "ABC 三格简录：前因→行为→后果" }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "support": {
+      "type": "object",
+      "title": "支持与干预",
+      "required": ["aac", "behavior_card", "progression_rules"],
+      "properties": {
+        "aac": {
+          "type": "array",
+          "description": "沟通支持工具，禁默认人人会口说",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+
+        "behavior_card": {
+          "type": "object",
+          "title": "跨课时行为支持卡（六要素）",
+          "required": [
+            "触发信号",
+            "前因调整",
+            "替代行为",
+            "强化计划",
+            "危机处置",
+            "全员一致要求"
+          ],
+          "properties": {
+            "触发信号": { "type": "string", "description": "可观察的前兆行为" },
+            "前因调整": { "type": "string", "description": "环境与任务降刺激措施" },
+            "替代行为": {
+              "type": "string",
+              "description": "须与问题行为功能对等，且已在先前课时教学并练习≥2次"
+            },
+            "强化计划": { "type": "string", "description": "逐课时削弱：连续强化→固定比率→变动强化＋社会性强化" },
+            "危机处置": {
+              "type": "string",
+              "description": "自伤/攻击/逃离/拒食处置流程，须含禁忌：禁体罚、禁惩罚性隔离、禁强制进食、禁当众批评"
+            },
+            "全员一致要求": { "type": "string", "description": "实施人/口令/记录方式，防换人漂移" }
+          }
+        },
+
+        "reinforcement_schedule": {
+          "type": "array",
+          "title": "逐课时强化削弱表",
+          "items": {
+            "type": "object",
+            "required": ["课时", "强化方式"],
+            "properties": {
+              "课时": { "type": "integer", "minimum": 1 },
+              "强化方式": { "type": "string" },
+              "轮换清单": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+
+        "progression_rules": {
+          "type": "object",
+          "title": "晋级/降级阈值",
+          "required": ["晋级", "降级", "无进展", "无参与", "危机"],
+          "properties": {
+            "晋级": { "type": "string", "description": "达成率≥80%且独立尝试成功率≥80%连续2课时→降一级支持" },
+            "降级": { "type": "string", "description": "降级后观察1课时，回落则回退一级" },
+            "无进展": { "type": "string", "description": "连续2课时LOS无晋级→回查路由矩阵、小步子步幅减半" },
+            "无参与": { "type": "string", "description": "N → 转环境调整＋优先参与目标，不计学业判据" },
+            "危机": { "type": "string", "description": "自伤/攻击/长时间逃离 → 降刺激、冷静角、任务降级、移除围观" }
+          }
+        }
+      }
+    },
+
+    "generalization": {
+      "type": "object",
+      "title": "生活泛化",
+      "required": ["家庭", "学校", "社区"],
+      "properties": {
+        "家庭": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "学校": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "社区": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+      }
+    },
+
+    "safety_alternatives": {
+      "type": "array",
+      "title": "安全替代表",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["环节材料", "风险", "安全替代"],
+        "properties": {
+          "环节材料": { "type": "string" },
+          "风险": { "type": "string" },
+          "安全替代": { "type": "string" }
+        }
+      }
+    },
+
+    "sensory_regulation": {
+      "type": "array",
+      "title": "感官调节与环境安排（课前必做）",
+      "description": "PBS 前因调整的前置层：先把噪声/光线/座位/口欲过敏/触觉五个维度的环境刺激降到位，再谈任务与强化。须覆盖五个维度，每条含触发信号→前置安排→课中降刺激通道。",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["维度", "触发信号", "前置安排", "降刺激通道"],
+        "properties": {
+          "维度": {
+            "type": "string",
+            "enum": ["听觉", "视觉", "前庭与座位", "口欲与过敏", "触觉与材料"]
+          },
+          "触发信号": { "type": "string" },
+          "前置安排": { "type": "string", "description": "上课前完成的环境安排" },
+          "降刺激通道": { "type": "string", "description": "课中即时可执行的降级通道，禁含惩罚性隔离" }
+        }
+      }
+    },
+
+    "iep_tracking": {
+      "type": "array",
+      "title": "IEP 长期目标跨课时累计追踪",
+      "description": "同一长期目标须跨课时累计（禁只记最后一课时）：年度长期目标 → 本课短期目标 → 分课时达成 → 累计尝试次数/成功率 → 下一课时调整。成功率 = 累计正确次数 ÷ 累计尝试次数；≥80% 触发降级评估。",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["学生代号", "年度长期目标", "本课短期目标", "分课时达成", "累计口径"],
+        "properties": {
+          "学生代号": { "type": "string", "pattern": "^生\\d+$" },
+          "年度长期目标": { "type": "string" },
+          "本课短期目标": { "type": "string", "description": "分课时拆分后的本课可测短期目标" },
+          "分课时达成": {
+            "type": "object",
+            "description": "键为课时序号（字符串），值为该课时达成记录（未实施留空由课后回填）",
+            "additionalProperties": { "type": "string" }
+          },
+          "累计口径": { "type": "string", "description": "累计尝试次数与成功率的计算口径" }
+        }
+      }
+    },
+
+    "materials": {
+      "type": "array",
+      "title": "材料清单（课前照单核对）",
+      "minItems": 1,
+      "items": { "type": "string" }
+    },
+
+    "placeholders": {
+      "type": "array",
+      "title": "未替换占位符清单",
+      "items": { "type": "string" }
+    },
+
+    "privacy": {
+      "type": "object",
+      "title": "红区合规声明",
+      "required": ["red_zone_free", "学生命名方式"],
+      "properties": {
+        "red_zone_free": { "type": "boolean", "const": true },
+        "学生命名方式": { "type": "string", "const": "代号 生N" },
+        "待替换项来源": { "type": "string" }
+      }
+    }
+  }
+}
