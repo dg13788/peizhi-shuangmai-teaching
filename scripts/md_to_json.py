@@ -16,7 +16,7 @@ import sys
 import glob
 import tempfile
 
-ENGINE_VERSION = '2.5.0'
+ENGINE_VERSION = '3.7.0'
 
 REPORT_DIR = os.path.join(tempfile.gettempdir(), 'peizhi_shuangmai')
 
@@ -153,6 +153,45 @@ def derive(text):
     dur = int(dur_m.group(1)) if dur_m else 35
     n_m = re.search(r'共(\d+)课时', meta_raw.get('课堂时长', '')) or re.search(r'共(\d+)课时', meta_raw.get('课时定位', ''))
     n = int(n_m.group(1)) if n_m else 1
+
+    # ---- 课时量研判（3.1.0 起：课时数由引擎研判，测算过程随产物留痕供教务溯源）----
+    judge = {}
+    j_sec = find_sec(secs, '课时量研判')
+    if j_sec:
+        jt = table_blocks(j_sec[2])
+        if jt:
+            jr = kv_table(*jt[0])
+
+            def jnum(key, pat, cast=float, default=0):
+                mm = re.search(pat, jr.get(key, ''))
+                try:
+                    return cast(mm.group(1))
+                except Exception:
+                    return default
+
+            base = jnum('基础时长', r'(\d+)\s*′', int)
+            rep_c = jnum('复现系数', r'(\d+(?:\.\d+)?)')
+            lay_c = jnum('分层系数', r'(\d+(?:\.\d+)?)')
+            eff = jnum('有效利用时长', r'≈\s*(\d+)\s*′', int)
+            if not eff:
+                eff = int(round(dur * 0.75))          # 兜底：单课时时长 × 0.75
+            calc = jnum('测算课时数', r'=\s*(\d+(?:\.\d+)?)')
+            if not calc and base and rep_c and lay_c and eff:
+                calc = round(base * rep_c * lay_c / eff, 2)   # 兜底：按测算式反算
+            jn = jnum('研判课时数N', r'(\d+)', int) or n
+            judge = {
+                '研判身份': jr.get('研判身份', ''),
+                '基础时长分钟': base,
+                '复现系数': rep_c,
+                '分层系数': lay_c,
+                '有效利用时长分钟': eff,
+                '测算课时数': calc,
+                '学科校验锚': jr.get('学科校验锚', ''),
+                '研判课时数N': jn,
+                '用户指定': jr.get('用户指定', '无'),
+                '确定方式': '轻打扰直定' if '轻打扰' in jr.get('确定方式', '') else '输出确认',
+                '研判依据': jr.get('研判依据', ''),
+            }
 
     # ---- anchors（多锚点；须定位到真正含列表的三级小节，避开父章节）----
     anchors = []
@@ -448,6 +487,7 @@ def derive(text):
             '授课日期': meta_raw.get('授课日期', '{{}}'),
             '执教者': meta_raw.get('执教者', '{{}}'),
             '课时数N': n,
+            '课时研判': judge,
             '单课时时长分钟': dur,
             '课型': meta_raw.get('课型', ''),
             '教学方法': meta_raw.get('教学方法', ''),

@@ -29,25 +29,30 @@
 
 ## 3. 回归测试最小集（发布前必跑）
 
-PR 合并前必须通过以下九项（详见 `references/release-checklist.md`）：
+PR 合并前必须通过以下十一项（详见 `references/release-checklist.md`）：
 
 - [ ] 示例课题实跑 1 篇，产出一致（每课时五列表〔含 BOPPPS 步别、≥1 个探究活动、
       时间合计=该课时时长〕、分课时目标矩阵、LOS 表逐课时成对列且全生覆盖）
 - [ ] 附件识别回归：内容提取卡七字段齐全（含红区拦截记录）、回填环节 0/1 生效、
       红区拦截生效
-- [ ] Word+PDF 双格式生成成功，`SKILL.md` §4 格式与无障碍基线核验全过
+- [ ] Word 成品生成成功，`SKILL.md` §4 格式与无障碍基线核验全过
       （字号下限、对比度 ≥7:1、色彩不得单靠颜色区分、黑体无衬线、表格有表头不溢出）
 - [ ] 多课时教案必带**跨课时行为干预支持卡**六要素齐全、强化计划逐课时削弱、
       晋级降级阈值含 80% 判据、危机处置四条红线（禁体罚/禁惩罚性隔离/禁强制进食/禁当众批评）
 - [ ] 机器可读产物合 `references/output-schema.json`（`anchors` 每条三级齐全，含 timeline 步别枚举与逐课时时间恒等硬约束）
 - [ ] **Single Source**：结构化 JSON 已由 md 源稿经 `python scripts/md_to_json.py` 派生（**禁止手工编辑 JSON**），且"落盘样例≡派生结果"PASS
-- [ ] **Word 成品**：已用 `python scripts/md_to_docx.py <成品目录>` 生成（**禁手工排版 markdown 产物**），
-      `--check` 判定成品 ≡ 源稿派生且字节幂等；需要时加 `--pdf` 导出（三通道皆无时须给出降级指引）
+- [ ] **Word 成品**：已用 `python scripts/md_to_docx.py <成品目录>` 生成（**禁手工排版 markdown 产物**）；
+      `--check` 判定成品 ≡ 源稿派生且字节幂等（**3.0.0 起仅交付 Word，不得回加 PDF 导出通道**）
 - [ ] `python scripts/regression_check.py` 全项 PASS（通过率必须为 100%，项数以报告为准；
       报告写系统临时目录 `peizhi_shuangmai/regression_report.txt`；含引擎自身防漂移校验：
       frontmatter 合规、SemVer、版号多处一致、五条铁律表述、外部引用存在性；
       含 md→JSON 派生一致性、Word 成品结构/版式/反篡改与双轨合规）
 - [ ] 全库扫描无真实姓名/照片/病历（红区零输入）
+- [ ] **三层渐进式披露**：新增或改动 `references/` 细则后，已在 `SKILL.md` 顶部"读取索引"登记
+      （回归"references/ 无孤儿文件"断言自动校验）；主文件体积 ≤12KB、行数 ≤150，
+      **禁止把细则回流进主文件**
+- [ ] **细则层不丢链**：`SKILL.md` 引用的全部 `references/` / `scripts/` / `examples/` 路径均存在；
+      新增细则由打包器自动入包（无需改白名单），`dist/*.zip` 含全部细则层文件
 
 > 发布到技能平台前追加一步：`python scripts/build_package.py` 产出 `dist/*.zip`，
 > 按 `references/release-checklist.md` 双轨清单逐项核对（打包器已强制 frontmatter 必检＋入包红区扫描）。

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://peizhi-shuangmai-teaching.local/schemas/output-schema.json",
   "title": "培智·双脉教学引擎 结构化教案输出契约",
-  "description": "机器可读教案输出契约（V2.5.0）。硬约束：①逐课时 sum(lessons[].timeline[].minutes) == meta.单课时时长分钟；②len(lessons) == meta.课时数N；③los_table 每生 records 逐课时成对且长度 == meta.课时数N；④support.behavior_card 六要素齐全；⑤学生一律代号，privacy.red_zone_free 必须为 true。本文件不由服务端强校验，由 scripts/regression_check.py 执行等价断言。",
+  "description": "机器可读教案输出契约（V3.3.0）。硬约束：①逐课时 sum(lessons[].timeline[].minutes) == meta.单课时时长分钟；②len(lessons) == meta.课时数N；③los_table 每生 records 逐课时成对且长度 == meta.课时数N；④support.behavior_card 六要素齐全；⑤学生一律代号，privacy.red_zone_free 必须为 true；⑥meta.课时研判.研判课时数N == meta.课时数N（课时数由引擎研判，非默认/非用户输入）。本文件不由服务端强校验，由 scripts/regression_check.py 执行等价断言。",
   "type": "object",
   "required": [
     "schema_version",
@@ -19,7 +19,7 @@
     "privacy"
   ],
   "properties": {
-    "schema_version": { "type": "string", "const": "2.5.0" },
+    "schema_version": { "type": "string", "const": "3.7.0" },
 
     "meta": {
       "type": "object",
@@ -34,6 +34,25 @@
         "执教者": { "type": "string" },
         "课时数N": { "type": "integer", "minimum": 1, "maximum": 6 },
         "单课时时长分钟": { "type": "integer", "enum": [25, 35, 40] },
+        "课时研判": {
+          "type": "object",
+          "title": "课时量研判（3.1.0 起课时数由引擎研判）",
+          "description": "记录测算过程与确定方式，供教务溯源与跨会话复用。研判身份为「学科资深教学专家＋培智特级教师」双身份；测算式 N = ceil(基础时长 × 复现系数 × 分层系数 ÷ 有效利用时长)，有效利用时长＝单课时时长×0.75。",
+          "required": ["研判身份", "基础时长分钟", "复现系数", "分层系数", "有效利用时长分钟", "测算课时数", "学科校验锚", "研判课时数N", "确定方式", "研判依据"],
+          "properties": {
+            "研判身份": { "type": "string" },
+            "基础时长分钟": { "type": "integer", "minimum": 1 },
+            "复现系数": { "type": "number", "minimum": 1.2, "maximum": 1.5 },
+            "分层系数": { "type": "number", "minimum": 1.1, "maximum": 1.3 },
+            "有效利用时长分钟": { "type": "integer", "minimum": 1 },
+            "测算课时数": { "type": "number", "minimum": 1 },
+            "学科校验锚": { "type": "string" },
+            "研判课时数N": { "type": "integer", "minimum": 1, "maximum": 6 },
+            "用户指定": { "type": "string", "description": "无 / 用户指定值，及与研判是否一致" },
+            "确定方式": { "type": "string", "enum": ["轻打扰直定", "输出确认"] },
+            "研判依据": { "type": "string" }
+          }
+        },
         "课型": { "type": "string" },
         "教学方法": { "type": "string" },
         "教材": {

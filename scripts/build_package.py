@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """技能包打包器：从 GitHub 仓库一键产出符合上传规范的 skill zip（双轨制的技能轨出口）。
 
-背景（2.5.0 双轨制）：仓库根保留 README/CHANGELOG/CONTRIBUTING/LICENSE 等 GitHub 治理文件，
+背景（2.5.0 双轨制，2.6.0 三层渐进式披露）：仓库根保留 README/CHANGELOG/CONTRIBUTING/LICENSE 等 GitHub 治理文件，
      豆包/千问/WorkBuddy 等技能平台的上传包则不应包含它们。本脚本从仓库抽取技能运行必需文件，
      产出干净的 dist/<name>.zip —— 仓库是开发态，zip 是上传态，二者同源不双维护。
 
@@ -9,12 +9,15 @@
   <name>/                    zip 顶层为技能名目录（取 SKILL.md frontmatter 的 name）
   ├── SKILL.md               主文件（frontmatter 必检 name+description）
   ├── scripts/               md_to_docx.py / md_to_json.py / regression_check.py / build_package.py
-  ├── references/            output-schema.json / format-baseline.md / release-checklist.md
+  ├── references/            自动收集全部 *.md 与 *.json（2.6.0 起不再用硬编码白名单，
+  │   │                      新增细则文件自动入包，杜绝漏包）：output-schema.json /
+  │   │                      domain-core.md / workflow.md / strategy-matrix.md /
+  │   │                      format-baseline.md / state-and-fallback.md / release-checklist.md
   │   └── LICENSE.md         由仓库根 LICENSE 复制（许可随包分发，根目录不另放 LICENSE）
-  └── examples/              基准 md 与派生 JSON（不含 docx/pdf 等二进制成品）
+  └── examples/              基准 md 与派生 JSON（不含 docx 等二进制成品）
 
 硬性排除：README/CHANGELOG/CONTRIBUTING/.gitignore/.git/.workbuddy/dist、*_report.txt、
-          *.docx/*.pdf、锚定单/内容提取卡等会话产物。
+          *.docx、锚定单/内容提取卡等会话产物。
 防呆：打包前校验 frontmatter 必填字段、对全部入包文本做红区扫描（命中即拒绝打包）、
      固定 zip 时间戳保证同一仓库状态产出逐字节恒定。
 
@@ -29,7 +32,7 @@ import zipfile
 import tempfile
 import hashlib
 
-ENGINE_VERSION = '2.5.0'
+ENGINE_VERSION = '3.7.0'
 ZIP_STAMP = (2020, 1, 1, 0, 0, 0)   # 固定时间戳 → 字节幂等
 
 REPORT_DIR = os.path.join(tempfile.gettempdir(), 'peizhi_shuangmai')
@@ -42,8 +45,16 @@ RED_RULES = [
     ('疑似病历号', re.compile(r'(病历|住院号|诊断书)[^\n]{0,10}\d{4,}')),
 ]
 
-INCLUDE_SCRIPTS = ('md_to_docx.py', 'md_to_json.py', 'regression_check.py', 'build_package.py')
-INCLUDE_REFERENCES = ('output-schema.json', 'format-baseline.md', 'release-checklist.md')
+def collect(root, sub, exts):
+    """自动收集子目录下指定扩展名的全部文件（新增文件无需改白名单，杜绝漏包）。
+
+    2.6.0 起 scripts/ 与 references/ 一律自动收集：三层渐进式披露架构下 references 会持续增长
+    （2.6.0 一次新增 4 个细则文件），硬编码白名单必然漏包，故改为目录级收集并保留排序确定性。
+    """
+    out = []
+    for ext in exts:
+        out += glob.glob(os.path.join(root, sub, ext))
+    return sorted(os.path.basename(p) for p in out)
 
 
 def report_path(name):
@@ -82,9 +93,9 @@ def main():
     # ② 收集入包文件（arcname → 绝对路径）
     files = {'%s/SKILL.md' % name: os.path.join(root, 'SKILL.md'),
              '%s/references/LICENSE.md' % name: os.path.join(root, 'LICENSE')}
-    for f in INCLUDE_SCRIPTS:
+    for f in collect(root, 'scripts', ('*.py',)):
         files['%s/scripts/%s' % (name, f)] = os.path.join(root, 'scripts', f)
-    for f in INCLUDE_REFERENCES:
+    for f in collect(root, 'references', ('*.md', '*.json')):
         files['%s/references/%s' % (name, f)] = os.path.join(root, 'references', f)
     for p in sorted(glob.glob(os.path.join(root, 'examples', '*.md'))) + \
             sorted(glob.glob(os.path.join(root, 'examples', '*.json'))):
@@ -128,7 +139,7 @@ def main():
     rep += ['  %s' % a for a in sorted(files)]
     rep.append('')
     rep.append('未入包（按规范排除）：README.md / CHANGELOG.md / CONTRIBUTING.md / .gitignore / '
-               '.git / .workbuddy / dist / *_report.txt / *.docx / *.pdf')
+               '.git / .workbuddy / dist / *_report.txt / *.docx')
     open(report_path('build_package_report.txt'), 'w', encoding='utf-8').write('\n'.join(rep))
     return 0
 

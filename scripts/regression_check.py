@@ -11,7 +11,7 @@
      SemVer / 版号一致 / 五条铁律 / 外部引用存在性
   ④ md→JSON 派生一致性（Single Source，含"落盘样例 ≡ 派生结果"防漂移）
   ⑤ Word 成品 md→docx：OOXML 包完整性与元素序列 / 版式契约 / 字节幂等 / 外部读取复校
-  ⑥ 交付通道契约：CLI 参数 / PDF 降级 / --check 反篡改（临时目录端到端）
+  ⑥ 交付通道契约：CLI 参数 / --check 反篡改（临时目录端到端）/ PDF 通道已移除（否定式断言）
   ⑦ 双轨合规与仓库卫生：技能标准布局（scripts/references/examples）/ 无二进制成品 /
      无运行期报告 / GitHub 治理文件保留且版本同步（README/CHANGELOG）/ 章节号 / 不硬编码项数
 输出：%TEMP%/peizhi_shuangmai/regression_report.txt（UTF-8；报告不进仓库）
@@ -67,7 +67,10 @@ def check(path):
     r = []
 
     m = re.search(r'_(\d)课时', name)
-    n = int(m.group(1)) if m else 1
+    # 课时数变量特意命名为 n_less：本节后续约 300 行都依赖它，
+    # 若用短名 n 极易被新增代码无意覆盖（3.6.0 曾因此让 N 变成指令句字数）
+    n_less = int(m.group(1)) if m else 1
+    r.append(('课时数N在合理范围(1~6)', 1 <= n_less <= 6, str(n_less)))
 
     # 1 封面两行标题相邻
     h1 = [i for i, l in enumerate(lines) if l.startswith('# ')]
@@ -96,7 +99,8 @@ def check(path):
     offhead = [b for b in bs if b and '教学环节' in b[0] and cells(b[0]) and cells(b[0])[0] != '教学环节']
     r.append(('五列表表头严格为"教学环节"', not offhead, str(offhead[:1])))
     proc_tables = [b for b in bs if b and cells(b[0]) and cells(b[0])[0] == '教学环节']
-    r.append(('五列表数量=课时数N', len(proc_tables) == n, '%d/%d' % (len(proc_tables), n)))
+    r.append(('五列表数量=课时数N', len(proc_tables) == n_less,
+              '%d/%d' % (len(proc_tables), n_less)))
     for idx, b in enumerate(proc_tables, 1):
         steps, minutes, inquiry = set(), 0, False
         for row in b[2:]:
@@ -110,12 +114,65 @@ def check(path):
         r.append(('第%d课时 BOPPPS 六步齐全' % idx, steps_needed <= steps, '缺 ' + str(steps_needed - steps) if not steps_needed <= steps else ''))
         r.append(('第%d课时 时间合计=35′' % idx, minutes == 35, str(minutes)))
         r.append(('第%d课时 含≥1探究活动' % idx, inquiry))
+        # 3.6.0 五列表填写规格（列内密度，禁骨架化；加列会触发横向节故锁死列数）
+        rows = b[2:]
+        p_rows = [rw for rw in rows if cells(rw) and '（P参·' in cells(rw)[0]]
+        r.append(('第%d课时 P参按子步骤分行(≥3行)' % idx, len(p_rows) >= 3,
+                  '实%d行' % len(p_rows)))
+        colbad = [rw for rw in rows if len(cells(rw)) != 5]
+        r.append(('第%d课时 五列表列数恒为5(禁加第6列)' % idx, not colbad,
+                  '实%d列' % len(cells(colbad[0])) if colbad else ''))
+        nocmd = [rw for rw in rows if '指令范式句' not in rw]
+        r.append(('第%d课时 每行教师活动含指令范式句' % idx, not nocmd,
+                  '缺%d行' % len(nocmd) if nocmd else ''))
+        VAGUE = ('认真听讲', '积极参与', '感受', '体会', '理解', '领悟', '欣赏')
+        vag = [rw for rw in rows if len(cells(rw)) > 2
+               and any(v in cells(rw)[2] for v in VAGUE)]
+        r.append(('第%d课时 学生活动为可观察行为(禁内隐词)' % idx, not vag,
+                  cells(vag[0])[2][:12] if vag else ''))
+        nolos = [rw for rw in rows if len(cells(rw)) > 3
+                 and not re.search(r'（[IVGPF/]+）', cells(rw)[3])]
+        r.append(('第%d课时 支持策略落LOS层级代号' % idx, not nolos,
+                  cells(nolos[0])[3][:12] if nolos else ''))
+        noev = [rw for rw in rows if len(cells(rw)) > 4
+                and '证据' not in cells(rw)[4]]
+        r.append(('第%d课时 设计意图附证据闭环' % idx, not noev,
+                  '缺%d行' % len(noev) if noev else ''))
+        bad_cmd, empty_verb = [], []
+        for rw in rows:
+            c = cells(rw)
+            if len(c) < 5:
+                continue
+            mc = re.search(r'指令范式句：\s*[“"]([^”"]+)[”"]', c[1])
+            if mc:
+                cmd_len = len(re.sub(r'[，。？！、…\s“”"]', '', mc.group(1)))
+                if cmd_len > 12:
+                    bad_cmd.append('%d字' % cmd_len)
+            for v in ('引导学生', '帮助学生', '培养学生', '教育学'):
+                if v in c[1]:
+                    empty_verb.append(v)
+        r.append(('第%d课时 指令范式句≤12字' % idx, not bad_cmd,
+                  ','.join(bad_cmd[:2])))
+        r.append(('第%d课时 教师活动禁无动作空话' % idx, not empty_verb,
+                  ','.join(empty_verb[:2])))
+
+    # 3.6.0 LOS 分层支持表含学情依据列（支持可溯源；列数仍须 <6 以免触发横向节）
+    # 表名在**表题**行（不进表格块）→ 按表头特征定位：首列"层级"＋含"支持类型"
+    losup = [b for b in bs if b and cells(b[0]) and cells(b[0])[0] == '层级'
+             and '支持类型' in ''.join(cells(b[0]))]
+    if losup:
+        hd = cells(losup[0][0])
+        r.append(('LOS分层支持表含学情依据列', '学情依据' in ''.join(hd), str(hd[:1])))
+        r.append(('LOS分层支持表列数=5(不触发横向节)', len(hd) == 5, '实%d列' % len(hd)))
+    else:
+        r.append(('LOS分层支持表存在', False))
 
     # 6 LOS 记录表逐课时成对列：1 + 2N + 1
     los = [b for b in bs if b and '起始LOS' in b[0]]
     if los:
         cols = len(cells(los[0][0]))
-        r.append(('LOS表逐课时成对列(1+2N+1=%d)' % (2 * n + 2), cols == 2 * n + 2, '实%d列' % cols))
+        r.append(('LOS表逐课时成对列(1+2N+1=%d)' % (2 * n_less + 2),
+                  cols == 2 * n_less + 2, '实%d列' % cols))
         rows = [c for c in los[0][2:] if cells(c)[0].startswith('生')]
         r.append(('LOS表全生覆盖(12人)', len(rows) == 12, '实%d人' % len(rows)))
     else:
@@ -124,6 +181,9 @@ def check(path):
     # 7 材料清单 ☐ 勾选
     seg = text.split('材料清单')[1][:600] if '材料清单' in text else ''
     r.append(('材料清单含☐勾选框', '☐' in seg))
+    # 3.6.0：教学过程向学生发家长记录条 → 材料清单必须列，否则课前照单核对必然漏带
+    if '家长记录条' in text:
+        r.append(('发家长记录条→材料清单须列', '家长记录条' in seg))
 
     # 8 安全替代表三列含风险
     safe = [b for b in bs if b and '安全替代' in b[0]]
@@ -154,6 +214,41 @@ def check(path):
 
     idxs = [cn2num(c) for c in cn]
     r.append(('章节编号连续', idxs == list(range(1, len(idxs) + 1)), '/'.join(cn)))
+
+    # 12b ===== 3.5.0 新增：课后回填宽表汇为文末单一附表 =====
+    # 理由：LOS 变化记录表（1+2N+1 列）与 IEP 累计追踪表（≥7 列）在纵向版心下每列仅约
+    # 1.7cm，压不进纵向；原地成横向节会把正文纵向流打断成三段（并逼出近空白页），故统一
+    # 收进文末附表。正文保留起始LOS预设速查，保障课上动线不因移表而断。
+    app_line = next((i for i, l in enumerate(lines)
+                     if l.startswith('## 附：课后回填附表')), -1)
+    r.append(('文末「课后回填附表」节存在', app_line > 0))
+    body_text = '\n'.join(lines[:app_line]) if app_line > 0 else text
+    appx_text = '\n'.join(lines[app_line:]) if app_line > 0 else ''
+    wide_pos, i = [], 0
+    while i < len(lines):
+        if lines[i].strip().startswith('|'):
+            j, cols = i, 0
+            while j < len(lines) and lines[j].strip().startswith('|'):
+                if not is_sep(lines[j]):
+                    cols = max(cols, len(cells(lines[j])))
+                j += 1
+            if cols >= 6:
+                wide_pos.append(i)
+            i = j
+        else:
+            i += 1
+    r.append(('宽表仅 LOS/IEP 两张', len(wide_pos) == 2, '%d 张' % len(wide_pos)))
+    r.append(('宽表全部位于文末附表(正文全程纵向)',
+              bool(wide_pos) and all(p > app_line for p in wide_pos),
+              '正文内仍留 %d 张' % len([p for p in wide_pos if p < app_line])))
+    r.append(('附表内含 LOS 变化记录表与 IEP 累计追踪表',
+              '起始LOS' in appx_text and '年度长期目标' in appx_text))
+    r.append(('正文保留起始LOS预设速查(课上动线不断)', '起始LOS预设速查' in body_text))
+    r.append(('IEP 累计口径随表进附表', '累计口径' in appx_text))
+    # 否定式：禁"附表N"第二套编号——两套体系会让"表号＝出现顺序"失效，教务核对必乱
+    r.append(('表号单一体系(禁"附表N"第二套编号)',
+              not re.search(r'\*\*附表\s*\d', text)
+              and not re.search(r'附表[一二三四]', text)))
 
     # 13 占位符保留
     r.append(('占位符{{}}保留', '{{}}' in text))
@@ -186,7 +281,8 @@ def check(path):
 
     # ===== 2.4.0 新增：五维感官调节前置 =====
     sn_sec = ''
-    msn = re.search(r'^### .*感官调节.*?(?=^## |^### (?!.*感官调节))', text, re.M | re.S)
+    # 末节收尾时用 \Z 兜底：3.5.0 起 IEP 附表已是文档最后一个小节，其后不再有 ^## / ^### 可锚
+    msn = re.search(r'^### .*感官调节.*?(?=^## |^### (?!.*感官调节)|\Z)', text, re.M | re.S)
     if msn:
         sn_sec = msn.group(0)
     r.append(('感官调节章节存在', bool(sn_sec)))
@@ -198,10 +294,13 @@ def check(path):
               bool(sn_tbl) and len(cells(sn_tbl[0][0])) == 4, '' if sn_tbl else '缺表'))
     r.append(('降刺激通道非惩罚性(无"隔离"作唯一通道)',
               bool(sn_sec) and '惩罚性' in sn_sec))
+    # 3.6.0：教学过程用到"闻"（多感官课常见）→ 感官表须有嗅觉维度，否则气味过敏无前置安排
+    if re.search(r'[“"]?闻[”"]?（|闻一闻|闻气味|—闻—', text):
+        r.append(('用"闻"则感官表含嗅觉维度', '嗅觉' in sn_sec, '缺嗅觉'))
 
     # ===== 2.4.0 新增：IEP 长期目标跨课时累计追踪 =====
     ie_sec = ''
-    mie = re.search(r'^### .*IEP.*?(?=^## |^### (?!.*IEP))', text, re.M | re.S)
+    mie = re.search(r'^### .*IEP.*?(?=^## |^### (?!.*IEP)|\Z)', text, re.M | re.S)
     if mie:
         ie_sec = mie.group(0)
     r.append(('IEP累计追踪章节存在', bool(ie_sec)))
@@ -210,19 +309,68 @@ def check(path):
     if ie_tbl:
         hdr = cells(ie_tbl[0][0])
         reach = len([h for h in hdr if re.search(r'课时\d+达成', h)])
-        r.append(('IEP追踪表逐课时达成列==N', reach == n, '实%d列/N=%d' % (reach, n)))
+        r.append(('IEP追踪表逐课时达成列==N', reach == n_less,
+                  '实%d列/N=%d' % (reach, n_less)))
         rows = [c for c in ie_tbl[0][2:] if cells(c) and cells(c)[0].startswith('生')]
         r.append(('IEP追踪表全生覆盖(12人)', len(rows) == 12, '实%d人' % len(rows)))
         r.append(('IEP累计口径含成功率算式', '累计' in ie_sec and '成功率' in ie_sec and '÷' in ie_sec))
 
-    # ===== 2.2.0 新增：排版与无障碍执行说明 =====
-    acc_sec = ''
-    ma = re.search(r'^## [一二三四五六七八九十]+、排版与无障碍执行说明.*?(?=^## )', text, re.M | re.S)
-    if ma:
-        acc_sec = ma.group(0)
-    r.append(('排版无障碍执行说明章节存在', bool(acc_sec)))
-    miss_a = [k for k in ['12pt', '24pt', '36pt', '7:1', '4.5:1', '不得仅依赖颜色'] if k not in acc_sec]
-    r.append(('无障碍基线要素齐全', not miss_a, '缺' + ','.join(miss_a) if miss_a else ''))
+    # ===== 2.2.0 起创设、3.2.0 重构：学生可视材料规格 =====
+    # 降级理由：原"排版与无障碍执行说明"大节描述的是**本 docx 的排版参数**，而 V2.4.0 起
+    # 这些已由 scripts/md_to_docx.py 代码固化、且引擎铁律禁止手工重排 → 对教师零信息量，
+    # 且"无引擎元信息/{{}} 占位符保留"属内部工作流语言，会随 Word 外发。故缩减为约束
+    # **教师另外制作的可视教具**（图卡/投屏/板书大字卡/打印学习单）的规格，归入配套件节。
+    ma = re.search(r'^### .*学生可视材料规格.*?(?=^## |^### (?!.*学生可视材料规格))',
+                   text, re.M | re.S)
+    acc_sec = ma.group(0) if ma else ''
+    in_kit = bool(re.search(r'^## [一二三四五六七八九十]+、配套件.*?^### .*学生可视材料规格',
+                            text, re.M | re.S))
+    r.append(('学生可视材料规格存在且归入配套件下(三级标题)', bool(acc_sec) and in_kit,
+              '缺三级标题' if not acc_sec else '未归入配套件'))
+    legacy = re.search(r'^## [一二三四五六七八九十]+、排版与无障碍', text, re.M)
+    r.append(('已无独立"排版与无障碍执行说明"大节(防回流)', not legacy))
+    leak = [k for k in ('12pt', '小四', 'A4', '页边距', '页脚居中页码', '{{}} 占位符保留')
+            if k in acc_sec]
+    r.append(('可视材料规格不描述成品排版参数(防回流)', not leak, ','.join(leak)))
+    miss_a = [k for k in ('36pt', '24pt', '18pt', '7:1', '4.5:1', '不得仅依赖颜色', '黑体')
+              if k not in acc_sec]
+    r.append(('可视材料规格要素齐全', not miss_a, '缺' + ','.join(miss_a) if miss_a else ''))
+
+    # ===== 3.3.0 新增：交付稿打印安全 / 交叉引用抗漂移 =====
+    # emoji 字形不在宋体与 Consolas 内，Word 靠系统 fallback 渲染，打印或另存时可能变方框；
+    # 板书设计图是教师照做教具的蓝图，出现豆腐块即失效 → 一律改用文字标签。
+    # 例外：U+2610 ☐ 是材料清单的勾选框，同时是 md_to_json.py 的**解析锚点**（不可替换），
+    # 且它是单色几何符号、Word 内置字体覆盖良好，故显式放行。
+    emo = re.findall(r'(?![\u2610-\u2612])[\u2600-\u26FF\u2700-\u27BF'
+                     r'\U0001F000-\U0001FAFF]', text)
+    r.append(('交付稿无 emoji(打印安全，防豆腐块)', not emo, ','.join(sorted(set(emo)))[:40]))
+    # 绝对编号会随章节增减漂移（认识5 曾写"见第十一节配套件"而配套件实为第十节）→ 一律改用节名
+    absref = re.findall(r'见第[一二三四五六七八九十]+节', text)
+    r.append(('交叉引用不用绝对编号(防章节漂移)', not absref, ','.join(absref)))
+    q = re.findall(r'^>', text, re.M)
+    r.append(('引用块使用 > 标记(口径/注释分层)', bool(q), '实%d处' % len(q)))
+
+    # ===== 3.1.0 新增：课时量研判（源稿侧，防"课时数靠默认/靠输入"回流）=====
+    mj = re.search(r'^### 课时量研判.*?(?=^## |^### (?!.*课时量研判))', text, re.M | re.S)
+    r.append(('课时量研判章节存在', bool(mj)))
+    if mj:
+        jseg = mj.group(0)
+        jkeys = ['研判身份', '基础时长', '复现系数', '分层系数', '有效利用时长',
+                 '测算课时数', '学科校验锚', '研判课时数N', '用户指定', '确定方式', '研判依据']
+        miss_j = [k for k in jkeys if k not in jseg]
+        r.append(('课时研判表字段齐全(11项)', not miss_j, '缺' + ','.join(miss_j) if miss_j else ''))
+        r.append(('研判身份为双身份(学科专家＋特级教师)',
+                  '资深教学专家' in jseg and '特级教师' in jseg))
+        r.append(('研判表有表头行(项目/内容)',
+                  bool([b for b in bs if b and cells(b[0]) and cells(b[0])[0] == '项目'])))
+        jhow = re.search(r'确定方式\s*\|\s*(轻打扰直定|输出确认)', jseg)
+        r.append(('确定方式属合法枚举(直定/确认)', bool(jhow), jhow.group(1) if jhow else ''))
+        jn = re.search(r'研判课时数N\s*\|\s*(\d+)', jseg)
+        r.append(('研判课时数N == 文件名课时数N',
+                  bool(jn) and int(jn.group(1)) == n_less,
+                  '%s/%s' % (jn.group(1) if jn else '?', n_less)))
+        r.append(('研判依据含三阶切分口径(感知→理解→表达/应用)',
+                  '感知' in jseg and ('应用' in jseg or '泛化' in jseg)))
 
     return name, r
 
@@ -308,6 +456,38 @@ def check_schema(root, ev=''):
     dur = data['meta']['单课时时长分钟']
     lessons = data['lessons']
     r.append(('JSON lessons 数 == 课时数N', len(lessons) == n, '%d/%d' % (len(lessons), n)))
+
+    # ===== 3.1.0 新增：课时量研判（课时数由引擎研判，非默认 1 课时、非用户输入）=====
+    jg = data.get('meta', {}).get('课时研判', {})
+    jk = ['研判身份', '基础时长分钟', '复现系数', '分层系数', '有效利用时长分钟',
+          '测算课时数', '学科校验锚', '研判课时数N', '确定方式', '研判依据']
+    miss_j = [k for k in jk if not jg.get(k)]
+    r.append(('JSON meta.课时研判 十项齐全', not miss_j, '缺' + ','.join(miss_j) if miss_j else ''))
+    r.append(('研判身份为双身份(学科专家＋特级教师)',
+              '资深教学专家' in jg.get('研判身份', '') and '特级教师' in jg.get('研判身份', '')))
+    r.append(('JSON 研判课时数N == 课时数N', jg.get('研判课时数N') == n,
+              '%s/%s' % (jg.get('研判课时数N'), n)))
+    r.append(('确定方式属合法枚举(直定/确认)',
+              jg.get('确定方式') in ('轻打扰直定', '输出确认'), str(jg.get('确定方式'))))
+    b, rc, lc, ef, calc = (jg.get('基础时长分钟'), jg.get('复现系数'), jg.get('分层系数'),
+                           jg.get('有效利用时长分钟'), jg.get('测算课时数'))
+    num_ok = all(isinstance(x, (int, float)) and x for x in (b, rc, lc, ef, calc))
+    if num_ok:
+        want = b * rc * lc / ef
+        r.append(('测算式可复核(基础×复现×分层÷有效≈测算值)', abs(want - calc) < 0.02,
+                  '%.2f vs %s' % (want, calc)))
+        r.append(('研判N == ceil(测算值)', n == int(calc) + (1 if calc % 1 else 0),
+                  'N=%d 测算=%s' % (n, calc)))
+        r.append(('复现/分层系数在规定区间', 1.2 <= rc <= 1.5 and 1.1 <= lc <= 1.3,
+                  '复现%s 分层%s' % (rc, lc)))
+        r.append(('有效利用时长 == 单课时时长×0.75(±1)', abs(ef - dur * 0.75) <= 1,
+                  '%s vs %s' % (ef, dur * 0.75)))
+        margin = (n - calc) / n
+        r.append(('双出口判定自洽(余量>10%且N≤3 ⇔ 轻打扰直定)',
+                  (margin > 0.10 and n <= 3) == (jg.get('确定方式') == '轻打扰直定'),
+                  '余量%.0f%% N=%d %s' % (margin * 100, n, jg.get('确定方式'))))
+    else:
+        r.append(('测算式可复核(基础×复现×分层÷有效≈测算值)', False, '研判字段非数值'))
 
     needed = {'B', 'O', 'P前', 'P参', 'P后', 'S'}
     steps_ok, time_ok, matrix_ok, inq_ok = True, True, True, True
@@ -475,18 +655,105 @@ def check_skill_md(root):
     miss_l = [k for k in laws if k not in text]
     r.append(('五条铁律表述保留', not miss_l, '缺' + ','.join(miss_l) if miss_l else ''))
     # 2.2.0 新增机制保留
+    # 2.6.0 三层渐进式披露：细则已外置到 references/，契约锚点按"引擎全库"判定
+    # （SKILL.md ∪ references/*.md），既允许外置瘦身，又防止外置过程中规则丢失
+    corpus = text + '\n' + '\n'.join(
+        open(x, encoding='utf-8').read()
+        for x in sorted(glob.glob(os.path.join(root, 'references', '*.md'))))
     mech = ['跨课时行为干预递进', 'ABC 简录', '连续 2 课时', '80%', '连续强化',
             '危机处置', '跨课时行为支持卡', '无参与(N)']
-    miss_m = [k for k in mech if k not in text]
-    r.append(('行为干预机制保留', not miss_m, '缺' + ','.join(miss_m) if miss_m else ''))
+    miss_m = [k for k in mech if k not in corpus]
+    r.append(('行为干预机制保留(全库)', not miss_m, '缺' + ','.join(miss_m) if miss_m else ''))
     acc = ['7:1', '4.5:1', '24pt', '36pt', '不得仅依赖颜色']
-    miss_a = [k for k in acc if k not in text]
-    r.append(('无障碍基线保留', not miss_a, '缺' + ','.join(miss_a) if miss_a else ''))
+    miss_a = [k for k in acc if k not in corpus]
+    r.append(('无障碍基线保留(全库)', not miss_a, '缺' + ','.join(miss_a) if miss_a else ''))
+    # 2.6.0 渐进式披露元断言：①主文件体积封顶（防细则回流膨胀）②细则层无孤儿文件
+    #   ③主文件常驻关键枚举（LOS/BOPPPS/分层/判据三段式）
+    size = len(text.encode('utf-8'))
+    r.append(('SKILL.md 体积≤12KB(渐进式披露防膨胀)', size <= 12288, '%d字节' % size))
+    orphan = [os.path.basename(x) for x in sorted(glob.glob(os.path.join(root, 'references', '*')))
+              if os.path.isfile(x) and os.path.basename(x) not in text]
+    r.append(('references/ 无孤儿文件(均被主文件引用)', not orphan, ','.join(orphan)))
+    enum = ['无参与(N)', 'BOPPPS', 'A轻度', '〔条件/支持〕']
+    miss_e = [k for k in enum if k not in text]
+    r.append(('主文件常驻关键枚举(LOS/BOPPPS/分层/判据)', not miss_e,
+              '缺' + ','.join(miss_e) if miss_e else ''))
+    # 主文件须声明三层架构与读取索引（否则后续维护者会把细则塞回主文件）
+    r.append(('主文件声明三层渐进式披露', '渐进式披露' in text))
+    # 纯对话平台可能不支持读取 references/ 文件 → 主文件必须写明该场景的降级出口，
+    # 否则细则层在豆包/千问等纯对话环境等于丢失
+    r.append(('主文件含"无法读取细则层"降级出口',
+              '不能读取' in text and '降级' in text))
     # 外部引用存在性（防改名失联）
     refs = re.findall(r'`((?:scripts|references)/[\w\.\-]+|examples/[\w一-龥\.\-]+\.(?:md|json))`', text)
     broken = [x for x in set(refs) if not os.path.exists(os.path.join(root, x.replace('/', os.sep)))]
     r.append(('SKILL.md 外部引用均存在', not broken, ','.join(broken)))
     return r
+
+
+def wide_table_count(text):
+    """md 中列数 ≥ 6 的表格数（生成器应渲染为独立的 A4 横向节）"""
+    lines = text.replace('\r\n', '\n').split('\n')
+    i, n = 0, 0
+    while i < len(lines):
+        if lines[i].strip().startswith('|'):
+            blk = []
+            while i < len(lines) and lines[i].strip().startswith('|'):
+                blk.append(lines[i].strip())
+                i += 1
+            rows = [[c.strip() for c in r.strip().strip('|').split('|')]
+                    for r in blk if r.strip('|').strip() and not SEP.match(r.replace('|', '').strip())]
+            if rows and max(len(x) for x in rows) >= 6:
+                n += 1
+        else:
+            i += 1
+    return n
+
+
+def wide_layout(text):
+    """3.5.0：**连续宽表段**数 + 文档是否以宽表段收尾。
+
+    生成器把"连续"宽表（其间仅隔标题/表题/口径引用这些轻量块）并入**同一**横向节，
+    不再每张宽表各起一节——否则两宽表之间只剩一行小标题时，该标题会被"横向节另页起"
+    逼成独占一整页，成品出现近空白页。轻量块不改变分节状态（它们被缓冲、归属待定）。"""
+    items, cur = [], []
+    for l in text.replace('\r\n', '\n').split('\n') + ['']:
+        s = l.strip()
+        if s.startswith('|'):
+            cur.append(s)
+            continue
+        if cur:
+            rows = [[c.strip() for c in r.strip().strip('|').split('|')] for r in cur
+                    if not SEP.match(r.replace('|', '').strip())]
+            cols = max((len(x) for x in rows), default=0)
+            items.append(('wide' if cols >= 6 else 'narrow', cols))
+            cur = []
+        if not s:
+            continue
+        if s.startswith('#') or s.startswith('>') or re.match(r'^\*\*表\d+', s):
+            items.append(('light', 0))
+        else:
+            items.append(('other', 0))
+    runs, in_run, ends = 0, False, False
+    for kind, _c in items:
+        if kind == 'wide':
+            if not in_run:
+                runs += 1
+                in_run = True
+            ends = True
+        elif kind == 'light':
+            pass                      # 轻量块被缓冲，不决定分节
+        else:
+            in_run, ends = False, False
+    return runs, ends
+
+
+def first_body_sect(doc):
+    """正文首节属性（第一个含页脚引用的 sectPr 片段）——3.4.0 起页码重排须落在它上面"""
+    for m in re.finditer(r'<w:sectPr>(.*?)</w:sectPr>', doc, re.S):
+        if 'footerReference' in m.group(1):
+            return m.group(1)
+    return ''
 
 
 def check_docx(root):
@@ -529,16 +796,57 @@ def check_docx(root):
         except Exception as e:
             r.append((tag + ' document.xml 良构', False, str(e)[:60]))
             continue
+        # ③ 打印安全与 markdown 残留（3.3.0）：成品正文不得出现 emoji，
+        #    不得出现未解析的 markdown 标记（如引用块的 "> " 前缀）
+        plain = re.sub(r'<[^>]+>', '', doc)
+        emo = re.findall(r'(?![\u2610-\u2612])[\u2600-\u26FF\u2700-\u27BF'
+                         r'\U0001F000-\U0001FAFF]', plain)
+        r.append((tag + ' 成品无 emoji(打印安全)', not emo, ','.join(sorted(set(emo)))[:40]))
+        junk = re.search(r'&gt;\s*[^\s]', plain)
+        r.append((tag + ' 成品无 markdown 残留符号(> 前缀)', not junk))
+        r.append((tag + ' 成品无 ** 与代码块围栏残留',
+                  '**' not in plain and '```' not in plain))
+
         first = doc.index('<w:sectPr>')
         cover_sp = doc[first:doc.index('</w:sectPr>', first)]
-        body_sp = doc[doc.rindex('<w:sectPr>'):]
-        r.append((tag + ' 封面独立成节(sectPr=2)', doc.count('<w:sectPr') == 2,
-                  '实%d' % doc.count('<w:sectPr')))
+        # 3.5.0 起文档可能以横向节（文末附表）收尾 → 页面与页边距须以**正文首节**为准，
+        # 不能再取最后一个 sectPr（那已是横向页属性）
+        body_sp = first_body_sect(doc)
+        # 3.5.0：连续宽表并入同一横向节 → 节数 = 2 + 2×连续宽表段 −(末节即横向时 1)
+        runs, ends_wide = wide_layout(text)
+        want_sect = 2 + 2 * runs - (1 if ends_wide else 0)
+        r.append((tag + ' 节属性数 = 2+2×连续宽表段−收尾修正',
+                  doc.count('<w:sectPr') == want_sect,
+                  'sectPr=%d 段=%d 收尾横向=%s 应%d'
+                  % (doc.count('<w:sectPr'), runs, ends_wide, want_sect)))
+        r.append((tag + ' 连续宽表段渲染为 A4 横向节',
+                  doc.count('<w:pgSz w:w="16840"') == runs,
+                  '横%d/段%d' % (doc.count('<w:pgSz w:w="16840"'), runs)))
+        # 3.5.0：文末附表收尾时末节即横向，不另起空纵向节 → 无空白尾页
+        last_sp = doc[doc.rindex('<w:sectPr>'):]
+        r.append((tag + ' 末节为横向且与"以宽表段收尾"一致',
+                  ('w:w="16840"' in last_sp) == ends_wide and 'footerReference' in last_sp))
+        # 3.5.0：同一横向段内的连续宽表之间不得有分节符（否则又变回各占一节）
+        wpos = []
+        for m in re.finditer(r'<w:tbl>', doc):
+            seg = doc[m.start():doc.find('</w:tbl>', m.start())]
+            if len(re.findall(r'<w:gridCol', seg)) >= 6:
+                wpos.append(m.start())
+        gap_bad = ['%d→%d' % (a, b) for a, b in zip(wpos, wpos[1:])
+                   if '<w:sectPr' in doc[doc.find('</w:tbl>', a):b]]
+        r.append((tag + ' 连续宽表之间无分节符(并入同一横向节)',
+                  len(wpos) >= 1 and not gap_bad, ','.join(gap_bad)))
         r.append((tag + ' 封面节无页脚引用(封面不出现页码)', 'footerReference' not in cover_sp))
-        r.append((tag + ' 正文节含页脚且正文起始页码=1',
-                  'footerReference' in body_sp and 'w:start="1"' in body_sp))
-        r.append((tag + ' 页脚为 PAGE/SECTIONPAGES 字段',
-                  'PAGE' in ftr and 'SECTIONPAGES' in ftr))
+        # 3.4.0：页码重排只加在**正文首节**（此前误加在末节 → 封面既占第 1 页使正文页码
+        #        整体偏移一格，末节又因 start=1 回跳）
+        r.append((tag + ' 页码重排唯一且落在正文首节',
+                  doc.count('<w:pgNumType w:start="1"/>') == 1
+                  and 'w:start="1"' in first_body_sect(doc),
+                  'pgNumType=%d' % doc.count('<w:pgNumType w:start="1"/>')))
+        # 3.4.0：含横向节的文档为多节结构，总页数域必然失真（SECTIONPAGES 按"本节页数"
+        #        计 → 横向页显示"共 1 页"；NUMPAGES 又计入无页码的封面）→ 页脚只标页码
+        r.append((tag + ' 页脚仅 PAGE 字段(不列必失真的总页数)',
+                  'PAGE' in ftr and 'SECTIONPAGES' not in ftr and 'NUMPAGES' not in ftr))
         r.append((tag + ' 页面 A4 与页边距 2.54/3.18cm',
                   'w:w="11906"' in body_sp and 'w:h="16840"' in body_sp
                   and 'w:top="1440"' in body_sp and 'w:left="1803"' in body_sp))
@@ -556,18 +864,59 @@ def check_docx(root):
         for t in tbls:
             grid = [int(x) for x in re.findall(r'<w:gridCol w:w="(\d+)"', t)]
             row0 = re.search(r'<w:tr>(.*?)</w:tr>', t, re.S).group(1)
-            if sum(grid) != 8300:
-                bad_w.append(sum(grid))
+            # 3.3.0 起宽表（≥6 列）落在横向节，版心为 13234；其余为纵向版心 8300
+            want_w = 13234 if len(grid) >= 6 else 8300
+            if sum(grid) != want_w:
+                bad_w.append('%d(应%d)' % (sum(grid), want_w))
             if '<w:tblHeader/>' in row0:
                 heads += 1
-            if len(grid) == 5:
+            # 3.6.0：5 列的不止教学过程表（LOS 分层支持表亦为 5 列）→ 按表头精确区分
+            if len(grid) == 5 and '教学环节' in row0:
                 want = [round(8300 * x / 100.0) for x in (14, 26, 20, 24, 16)]
                 if max(abs(a - b) for a, b in zip(grid, want)) > 3:
                     ratio_bad.append(str(grid))
-        r.append((tag + ' 表格宽度合计=版心且不溢出', not bad_w, str(bad_w[:2])))
+        r.append((tag + ' 表格宽度合计=所在节版心且不溢出', not bad_w, str(bad_w[:2])))
         r.append((tag + ' 表格表头跨页重复', len(tbls) > 0 and heads == len(tbls),
                   '%d/%d' % (heads, len(tbls))))
         r.append((tag + ' 五列表列宽比 14/26/20/24/16', not ratio_bad, ','.join(ratio_bad[:1])))
+        doc_wide = sum(1 for t in tbls if len(re.findall(r'<w:gridCol', t)) >= 6)
+        r.append((tag + ' 成品宽表数与 md 宽表数一致',
+                  doc_wide == wide_table_count(text),
+                  'docx%d/md%d' % (doc_wide, wide_table_count(text))))
+
+        # ③a' 3.4.0：表题—表格同页契约。此前表题属前一纵向节、宽表进横向节（新页起），
+        #      表题被孤零零留在上一页；现由生成器把表题挂起、随表落入同一节。
+        md_caps = re.findall(r'^\*\*((?:表\d+|附)[^\n]*?)\*\*\s*$', text, re.M)
+        ppos = {}
+        for m in re.finditer(r'<w:p>(.*?)</w:p>', doc, re.S):
+            t = ''.join(re.findall(r'<w:t[^>]*>([^<]*)</w:t>', m.group(1))).strip()
+            ppos.setdefault(t, (m.start(), m.end(), m.group(1)))
+        located = [c for c in md_caps if c in ppos]
+        r.append((tag + ' 表题全部在成品中定位', bool(located) and len(located) == len(md_caps),
+                  '%d/%d' % (len(located), len(md_caps))))
+        sep_bad = [c[:14] for c in located
+                   if doc.find('<w:tbl>', ppos[c][1]) > 0
+                   and '<w:sectPr' in doc[ppos[c][1]:doc.find('<w:tbl>', ppos[c][1])]]
+        r.append((tag + ' 表题带 keepNext 且与其后表格同节(无分节符隔断)',
+                  bool(located) and not sep_bad
+                  and all('<w:keepNext/>' in ppos[c][2] for c in located), ','.join(sep_bad)))
+        paren = [c for c in located if '（' in c]
+        r.append((tag + ' 表题括号说明另起一行(w:br)，无括号表题不插多余换行',
+                  bool(paren) and all('<w:br/>' in ppos[c][2] for c in paren)
+                  and all('<w:br/>' not in ppos[c][2] for c in located if '（' not in c),
+                  '%d 条带括号' % len(paren)))
+        wide_cap_bad = []
+        for c in located:
+            en = ppos[c][1]
+            ntbl = doc.find('<w:tbl>', en)
+            if ntbl < 0:
+                continue
+            mt = re.match(r'<w:tbl>(.*?)</w:tbl>', doc[ntbl:], re.S)
+            if mt and len(re.findall(r'<w:gridCol', mt.group(1))) >= 6:
+                ns = doc.find('<w:sectPr>', en)
+                if 'w:w="16840"' not in doc[ns:doc.find('</w:sectPr>', ns)]:
+                    wide_cap_bad.append(c[:14])
+        r.append((tag + ' 宽表表题随表进入横向节', not wide_cap_bad, ','.join(wide_cap_bad)))
 
         # ③b OOXML 包完整性 + 版式细节 + 无障碍底线
         names = z.namelist()
@@ -601,8 +950,8 @@ def check_docx(root):
             idx = [fragment.find(t) for t in tags]
             return all(i >= 0 for i in idx) and idx == sorted(idx)
         r.append((tag + ' sectPr 元素序(footerRef→pgSz→pgMar→pgNumType→cols→docGrid)',
-                  seq_ok(body_sp, ['<w:footerReference', '<w:pgSz', '<w:pgMar',
-                                   '<w:pgNumType', '<w:cols', '<w:docGrid'])))
+                  seq_ok(first_body_sect(doc), ['<w:footerReference', '<w:pgSz', '<w:pgMar',
+                                                '<w:pgNumType', '<w:cols', '<w:docGrid'])))
         tblpr = re.search(r'<w:tblPr>(.*?)</w:tblPr>', doc, re.S)
         r.append((tag + ' tblPr 元素序(tblW→jc→borders→layout→cellMar)',
                   tblpr is not None and seq_ok(tblpr.group(1),
@@ -644,20 +993,21 @@ def check_docx(root):
 
 
 def check_delivery(root):
-    """交付通道契约（2.4.0 起）：CLI 参数 / PDF 降级不阻断 / --check 反篡改端到端
+    """交付通道契约（3.0.0 起）：CLI 参数 / PDF 通道已移除（否定式断言）/ --check 反篡改端到端
     （2.5.0 起 docx 成品不入库，反篡改端到端在系统临时目录执行，不触碰仓库）"""
     r = []
     src = open(os.path.join(root, 'scripts', 'md_to_docx.py'), encoding='utf-8').read()
     r.append(('CLI 支持 --check', "'--check' in sys.argv" in src))
-    r.append(('CLI 支持 --pdf', "'--pdf' in sys.argv" in src))
+    # 3.0.0：PDF 输出通道与 --pdf 参数已彻底移除 → 一律用**否定式断言**锁死，防日后回流
+    r.append(('CLI 不再支持 --pdf(3.0.0 移除)', "'--pdf' in sys.argv" not in src))
+    r.append(('生成器源码无 PDF 导出通道(3.0.0 移除)',
+              'export_pdf' not in src and 'wdFormatPDF' not in src and 'docx2pdf' not in src))
     sys.path.insert(0, os.path.join(root, 'scripts'))
     try:
         import md_to_docx as G
-        how = G.export_pdf(os.path.join(root, 'examples', '__none__.docx'),
-                           os.path.join(root, 'examples', '__none__.pdf'))
-        r.append(('PDF 三通道皆无时降级返回 None(不阻断交付)', how is None, str(how)))
+        r.append(('生成器不暴露 PDF 导出函数', not hasattr(G, 'export_pdf')))
     except Exception as e:
-        r.append(('PDF 三通道皆无时降级返回 None(不阻断交付)', False, str(e)[:60]))
+        r.append(('生成器不暴露 PDF 导出函数', False, str(e)[:60]))
 
     # 在临时目录复刻 `--check` 的判定逻辑（跨进程调用在部分 Windows 控制台下会产生解码噪声；
     # 判定核心是「落盘成品 hash ≡ 源稿派生 hash」，进程内执行等价且更快）
@@ -709,9 +1059,20 @@ def check_repo(root, ev):
     # ① 技能标准布局（scripts/ + references/ + examples/）
     r.append(('scripts/ 四脚本齐全(含打包器)', all(os.path.exists(os.path.join(root, 'scripts', f)) for f in
               ('md_to_docx.py', 'md_to_json.py', 'regression_check.py', 'build_package.py'))))
-    r.append(('references/ 三件齐全', all(os.path.exists(os.path.join(root, 'references', f)) for f in
-              ('output-schema.json', 'format-baseline.md', 'release-checklist.md'))))
+    # 2.6.0 三层渐进式披露：references/ 承载细则层，七件缺一即断链
+    ref_need = ('output-schema.json', 'format-baseline.md', 'release-checklist.md',
+                'domain-core.md', 'workflow.md', 'strategy-matrix.md', 'state-and-fallback.md')
+    miss_ref = [f for f in ref_need if not os.path.exists(os.path.join(root, 'references', f))]
+    r.append(('references/ 细则层七件齐全', not miss_ref, '缺' + ','.join(miss_ref) if miss_ref else ''))
     r.append(('docs/ 自定义目录已移除', not os.path.exists(os.path.join(root, 'docs'))))
+    # 打包器不得硬编码入包白名单（细则层会持续增长，白名单必然漏包）
+    bp = os.path.join(root, 'scripts', 'build_package.py')
+    bps = open(bp, encoding='utf-8').read() if os.path.exists(bp) else ''
+    r.append(('打包器自动收集入包文件(无硬编码白名单)',
+              'INCLUDE_REFERENCES' not in bps and 'INCLUDE_SCRIPTS' not in bps
+              and 'def collect(' in bps))
+    r.append(('打包器覆盖 scripts/*.py 与 references/*.md|json',
+              all(x in bps for x in ("'*.py'", "'*.md'", "'*.json'"))))
     # ② GitHub 轨：治理文件保留且与当前版本同步
     gov = [f for f in ('README.md', 'CHANGELOG.md', 'CONTRIBUTING.md', 'LICENSE', '.gitignore')
            if not os.path.exists(os.path.join(root, f))]
@@ -726,9 +1087,8 @@ def check_repo(root, ev):
     except Exception as e:
         r.append(('README/CHANGELOG 可读', False, str(e)[:60]))
     # ③ 包体卫生：无二进制成品、无运行期报告、无临时调试件（递归，跳过隐藏目录与 dist）
-    bins = glob.glob(os.path.join(root, 'examples', '*.docx')) + \
-        glob.glob(os.path.join(root, 'examples', '*.pdf'))
-    r.append(('examples/ 无二进制成品(docx/pdf)', not bins,
+    bins = glob.glob(os.path.join(root, 'examples', '*.docx'))
+    r.append(('examples/ 无二进制成品(docx)', not bins,
               ','.join(os.path.basename(b) for b in bins[:3])))
     junk = []
     for dp, dn, fn in os.walk(root):
@@ -737,9 +1097,9 @@ def check_repo(root, ev):
             if f.endswith('_report.txt') or f.startswith('_'):
                 junk.append(os.path.relpath(os.path.join(dp, f), root))
     r.append(('仓库无运行期报告与临时调试件', not junk, ','.join(junk[:3])))
-    # ④ SKILL.md 体积（渐进式披露：主文件 ≤500 行）
+    # ④ SKILL.md 体积（渐进式披露：主文件只做路由层，行数字节双封顶）
     n_lines = len(open(os.path.join(root, 'SKILL.md'), encoding='utf-8').read().splitlines())
-    r.append(('SKILL.md 行数≤500(渐进式披露)', n_lines <= 500, '%d行' % n_lines))
+    r.append(('SKILL.md 行数≤150(路由层)', n_lines <= 150, '%d行' % n_lines))
     # ⑤ .gitignore：覆盖缓存/工作目录/打包产物
     gi_p = os.path.join(root, '.gitignore')
     gi = open(gi_p, encoding='utf-8').read() if os.path.exists(gi_p) else ''
@@ -758,10 +1118,31 @@ def check_repo(root, ev):
         bad = [s for s in re.findall(r'§(\d+)', t) if int(s) > 6]
         if bad:
             stale_sec.append('%s:%s' % (os.path.basename(p), ','.join(bad)))
-        if re.search(r'(?<![\d.])\d{2,3}\s*/\s*\d{2,3}(?![\d.])', t):
+        # 排除多段比例链（如五列表列宽比 14/26/20/24/16）：其每段两侧仍带 '/'，
+        # 而"通过率 232/232"这类硬编码两侧不带 '/'
+        hits = [m for m in re.finditer(r'(?<![\d.])\d{2,3}\s*/\s*\d{2,3}(?![\d.])', t)
+                if not (m.start() > 0 and t[m.start() - 1] == '/')
+                and not (m.end() < len(t) and t[m.end()] == '/')]
+        if hits:
             stale_num.append(os.path.basename(p))
     r.append(('现行文档无已废弃章节号(>§6)', not stale_sec, ';'.join(stale_sec)))
     r.append(('治理文件不硬编码回归项数(改引用报告)', not stale_num, ','.join(stale_num)))
+    # ⑦ 3.0.0 单格式（源 md ＋ Word 成品）：引擎全库不得残留任何 PDF 输出表述。
+    #    扫描范围＝SKILL.md ＋ references/*.md ＋ scripts/*.py；本文件因需内置关键词字面量，跳过自身。
+    #    注：附件"教材 PDF/Word"属**输入**类型，写法为 PDF/Word 不在关键词内，故不受影响。
+    pdf_words = ['Word/PDF', 'Word+PDF', 'Word·PDF', 'Word 与 PDF', '.pdf', '--pdf',
+                 'export_pdf', 'PDF 成品', 'PDF 导出', '双格式']
+    pdf_hits = []
+    for p in [os.path.join(root, 'SKILL.md')] + \
+            sorted(glob.glob(os.path.join(root, 'references', '*.md'))) + \
+            sorted(glob.glob(os.path.join(root, 'scripts', '*.py'))):
+        if os.path.basename(p) == 'regression_check.py':
+            continue
+        t = open(p, encoding='utf-8').read()
+        hit = [w for w in pdf_words if w in t]
+        if hit:
+            pdf_hits.append('%s:%s' % (os.path.basename(p), ','.join(hit)))
+    r.append(('引擎全库无 PDF 输出表述(3.0.0 单格式)', not pdf_hits, ';'.join(pdf_hits)))
     return r
 
 
@@ -805,7 +1186,7 @@ def main():
         ok += 1 if item[1] else 0
         out.append('  [%s] %s %s' % ('PASS' if item[1] else 'FAIL', item[0], item[2] if len(item) > 2 else ''))
     out.append('')
-    out.append('=== 交付通道契约 md→docx CLI / PDF 降级 / 反篡改 ===')
+    out.append('=== 交付通道契约 md→docx CLI / 反篡改 / PDF 已移除 ===')
     for item in check_delivery(ROOT):
         total += 1
         ok += 1 if item[1] else 0
