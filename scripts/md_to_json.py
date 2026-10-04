@@ -16,7 +16,7 @@ import sys
 import glob
 import tempfile
 
-ENGINE_VERSION = '3.7.0'
+ENGINE_VERSION = '3.14.0'
 
 REPORT_DIR = os.path.join(tempfile.gettempdir(), 'peizhi_shuangmai')
 
@@ -113,12 +113,34 @@ def parse_bold_kv(body):
 CN_NUM = {'一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9}
 
 
+# 课时序号唯一解析入口（3.14.0）：容许中文数字／全角数字／序数与"课时"之间的空格。
+# 此前散落三处硬编码 `re.search(r'第(\d+)课时', t)`：教师把标题写成「第一课时」「第 2 课时」
+# 这类最常见的中文书写形态时**匹配失败**，该课时的 timeline 与目标矩阵被 continue 静默丢弃，
+# 而 lessons 数与 meta.课时数N 仍照常输出——派生便得到一份"课时齐全但教学过程全空"的教案，
+# 且不报错、不告警。CN_NUM 与 cn2int 早已备好却从未被调用（死代码），本版接上。
+_LESSON_NUM_RE = re.compile(r'第\s*([0-9０-９一二三四五六七八九十]{1,3})\s*课时')
+_FULLWIDTH = str.maketrans('０１２３４５６７８９', '0123456789')
+
+
 def cn2int(s):
     if s in CN_NUM:
         return CN_NUM[s]
     if s.startswith('十'):
         return 10 + (CN_NUM.get(s[1:], 0) if len(s) > 1 else 0)
+    if len(s) == 2 and s[0] in CN_NUM and s[1] == '十':      # 二十 / 三十
+        return CN_NUM[s[0]] * 10
     return 0
+
+
+def lesson_idx(title):
+    """取课时序号；无法识别返回 0（调用方自行决定兜底策略）。"""
+    m = _LESSON_NUM_RE.search(title or '')
+    if not m:
+        return 0
+    raw = m.group(1).translate(_FULLWIDTH)
+    if raw.isdigit():
+        return int(raw)
+    return cn2int(raw)
 
 
 def parse_step(name_cell):
@@ -243,10 +265,9 @@ def derive(text):
     matrices = []
     for _, t, body in secs:
         joined = '\n'.join(body)
-        m = re.search(r'第(\d+)课时', t)
-        if not m or ('目标矩阵' not in joined and '维度' not in joined):
+        idx = lesson_idx(t)
+        if not idx or ('目标矩阵' not in joined and '维度' not in joined):
             continue
-        idx = int(m.group(1))
         for header, rows in table_blocks(body):
             if not header or '维度' not in header[0]:
                 continue
@@ -263,10 +284,9 @@ def derive(text):
     # ---- 五列表 / 探究活动 ----
     timelines, inquiries, boards = {}, {}, {}
     for _, t, body in secs:
-        m = re.search(r'第(\d+)课时', t)
-        if not m:
+        idx = lesson_idx(t)
+        if not idx:
             continue
-        idx = int(m.group(1))
         for header, rows in table_blocks(body):
             if not header or '教学环节' not in header[0]:
                 continue
@@ -364,9 +384,11 @@ def derive(text):
             for r in [header] + rows:
                 if len(r) < 2 or not r[0]:
                     continue
-                mm = re.match(r'^第(\d+)课时[·・]\s*([ABC])', r[0])
+                mm = re.match(r'^(第\s*[0-9０-９一二三四五六七八九十]{1,3}\s*课时)[·・]\s*([ABC])', r[0])
                 if mm:
-                    homework.setdefault(int(mm.group(1)), {})[mm.group(2)] = r[1]
+                    _i = lesson_idx(mm.group(1))
+                    if _i:
+                        homework.setdefault(_i, {})[mm.group(2)] = r[1]
                 elif len(r) >= 2 and r[0] in ('A', 'B', 'C'):
                     pass
 

@@ -940,6 +940,50 @@ def check_derived(root, ev=''):
         dur = data['meta']['单课时时长分钟']
         tag = '[%s]' % nm
         r.append((tag + ' 派生 lessons 数==N', len(data['lessons']) == n, '%d/%d' % (len(data['lessons']), n)))
+        # 3.14.0 守恒断言：源稿五列表数据行数 ≡ JSON timeline 行数。
+        # 起因——课时标题写成「第一课时」「第 2 课时」这类最常见中文形态时，旧版解析
+        # `第(\d+)课时` 匹配失败 → 该课时被 continue 静默丢弃，timeline 归零而 lessons
+        # 数与 meta.N 照常输出，派生即得"课时齐全、教学过程全空"的教案且不报错。
+        # 逐个猜书写形态是打不完的地鼠；**数量守恒**才是覆盖未知变体的治本手段：
+        # 只要源稿里有数据行却没进 JSON，无论何种写法都会被这条抓住，且报错直指真相。
+        src_txt = open(f, encoding='utf-8').read()
+        src_ln = re.sub(r'\r\n?', '\n', src_txt).split('\n')
+        md_tl = 0
+        for _b in blocks(src_ln):
+            hd = [c.strip() for c in _b[0].strip().strip('|').split('|')]
+            if hd and hd[0] == '教学环节' and len(hd) >= 5:
+                md_tl += sum(1 for rw in _b[1:] if not is_sep(rw) and cells(rw)[0].strip())
+        js_tl = sum(len(ls.get('timeline', [])) for ls in data['lessons'])
+        r.append((tag + ' 五列表行数守恒(md≡JSON)', md_tl == js_tl and md_tl > 0,
+                  'md%d/JSON%d' % (md_tl, js_tl)))
+        # 目标矩阵同理：3 维度 × 3 层 = 9 格/课时，一格不少才准
+        md_om = 0
+        for _b in blocks(src_ln):
+            hd = [c.strip() for c in _b[0].strip().strip('|').split('|')]
+            # 表头形态多样（「维度」「维度（层级）」），而「感官/环境维度」「复盘维度」
+            # 同样含"维度"二字——只认 # 列结构判据：目标矩阵必为 首列含维度 + A/B/C 三层列。
+            # （禁用 hd[0]=='维度' 精确相等；也禁用单看"维度"子串，二者都误判过同一张表。）
+            _hp = ''.join(hd[1:])
+            if (hd and '维度' in hd[0] and '感官' not in hd[0] and '复盘' not in hd[0]
+                    and len(hd) >= 4 and all(x in _hp for x in ('A', 'B', 'C'))):
+                md_om += sum(1 for rw in _b[1:] if not is_sep(rw) and cells(rw)[0].strip())
+        js_om = sum(len(ls.get('objectives_matrix', [])) for ls in data['lessons'])
+        r.append((tag + ' 目标矩阵格数守恒(md≡JSON×3层)', js_om == md_om * 3 and md_om > 0,
+                  'md%d行×3=%d / JSON%d' % (md_om, md_om * 3, js_om)))
+        # 课时序号鲁棒性：源稿整体改写为「第一课时」等中文数字形态后重派生，
+        # 内容不得缩水——这是对上述三类变体的正向验证（不依赖源稿自身的写法）。
+        try:
+            import importlib, md_to_json as _MJ
+            importlib.reload(_MJ)
+            _CN = {'1': '一', '2': '二', '3': '三', '4': '四', '5': '五', '6': '六'}
+            _mut = re.sub(r'第(\d)课时',
+                          lambda mm: '第%s课时' % _CN.get(mm.group(1), mm.group(1)), src_txt)
+            _d2 = _MJ.derive(_mut)
+            _bad = [ls.get('课时序号') for ls in _d2['lessons'] if not ls.get('timeline')]
+            r.append((tag + ' 中文数字课时标题不丢内容', not _bad,
+                      '空timeline课时%s' % _bad if _bad else '全部完好'))
+        except Exception as e:
+            r.append((tag + ' 中文数字课时标题不丢内容', False, str(e)[:60]))
         bad = []
         for ls in data['lessons']:
             s = sum(x['分钟'] for x in ls['timeline'])
@@ -1005,20 +1049,26 @@ def check_skill_md(root):
         return [('SKILL.md frontmatter 存在', False)]
     head = fm.group(1)
     keys = [l.split(':', 1)[0] for l in head.splitlines() if l and not l.startswith(' ')]
-    # —— AgentKit / 豆包 / 千问技能规范（2.5.0 起）：name+description 必填、version 平台解析、
-    #    其余顶层字段仅限规范白名单（license/compatibility/metadata/allowed-tools）——
+    # —— 技能平台规范：name+description+version 必填；顶层字段限规范白名单；
+    #    展示类字段（display_name/display_name_en/description_zh/description_en）按目标平台要求
+    #    置于顶层 frontmatter（校验器读顶层 key），author/tags 仍收在 metadata 下 ——
     need = ['name', 'description', 'version']
     miss = [k for k in need if k not in keys]
     r.append(('frontmatter 必填字段齐全(name/description/version)', not miss,
               '缺' + ','.join(miss) if miss else ''))
     allowed = {'name', 'description', 'version', 'license', 'compatibility',
-               'metadata', 'allowed-tools'}
+               'metadata', 'allowed-tools', 'display_name', 'display_name_en',
+               'description_zh', 'description_en'}
     extra = [k for k in keys if k not in allowed]
     r.append(('frontmatter 顶层字段不超出规范白名单', not extra, ','.join(extra)))
-    banned = ['display_name', 'display_name_en', 'description_zh', 'description_en',
-              'tags', 'requires', 'author']
+    # 平台校验器读顶层 key：展示类字段须位于顶层 frontmatter
+    required_top = ['display_name', 'display_name_en', 'description_zh', 'description_en']
+    miss_top = [k for k in required_top if k not in keys]
+    r.append(('展示字段位于顶层 frontmatter(平台读顶层 key)', not miss_top,
+              ','.join(miss_top)))
+    banned = ['requires']  # 其余非标顶层字段仍禁出现（author/tags 收在 metadata 下）
     left = [k for k in banned if k in keys]
-    r.append(('旧版非标顶层字段已移除(防平台解析异常)', not left, ','.join(left)))
+    r.append(('非标顶层字段未出现(requires)', not left, ','.join(left)))
     nm = re.search(r'^name: (.+)$', head, re.M)
     nm_v = nm.group(1).strip() if nm else ''
     r.append(('name 合规(小写+连字符,≤64,不含agentkit)',
@@ -1042,6 +1092,25 @@ def check_skill_md(root):
             sv = 'ERR'
     r.append(('JSON 样例版本与引擎一致', sv == v, 'JSON=%s SKILL=%s' % (sv, v)))
     r.append(('SKILL.md 正文标题含版本号', ('V' + v) in text, 'V' + v))
+    # 3.14.0 路由层摘要口径不得落后于细则层：**维度感官**这类枚举型数字必须与
+    # domain-core.md 的实到维度数一致。3.13.0 把执行层与契约层都升到六维（补嗅觉），
+    # 唯独漏了 frontmatter description——那是对外展示与检索用的一句话，恰好最不该错。
+    # 细则升级而摘要不动 = 铁律"细则改动须同步主文件摘要"被违反，故交由脚本把门。
+    _dc = os.path.join(root, 'references', 'domain-core.md')
+    if os.path.exists(_dc):
+        _dct = open(_dc, encoding='utf-8').read()
+        # （首个版本用 `[^。\n]{0,400}` 从标题取窗口，但标题行后紧跟换行 → 窗口为空，
+        #  读不到"六维度"三个字；改为全文定位"N维度"声明，不受换行与加粗写法影响）
+        _declared = re.search(r'([一二三四五六七八九十]+)\s*维度', _dct)
+        _CNd = {'一': 1, '二': 2, '三': 3, '四': 4,
+                '五': 5, '六': 6, '七': 7, '八': 8, '九': 9}
+        _want = _CNd.get(_declared.group(1)) if _declared else None
+        _got = re.search(r'([一二三四五六七八九十]+)维感官', ds_v) or re.search(
+            r'([一二三四五六七八九十]+)维感官', head)
+        _have = _CNd.get(_got.group(1)) if _got else None
+        r.append(('frontmatter 感官维数≡domain-core 口径',
+                  _want is not None and _have == _want,
+                  'frontmatter=%s domain-core=%s' % (_have, _want)))
     # 五条铁律不漂移
     laws = ['红区零输入零输出', '学情禁编造', '教材禁杜撰', '课标锚点三级', '时长恒等']
     miss_l = [k for k in laws if k not in text]
@@ -1522,6 +1591,21 @@ def check_repo(root, ev):
     r.append(('references/ 细则层%d件齐全' % len(ref_need), not miss_ref,
               '缺' + ','.join(miss_ref) if miss_ref else ''))
     # ②-b 元断言：回归脚本自身禁止再写 "标题符 + .* + 关键词 + lookahead" 的取段正则。
+    # 3.13.0 实测惨案：`^### .*感官调节.*?(?=^## |…)` 在 re.S 下 . 跨行 → 从文档首个 ###
+    # 起一路吞到关键词首次出现处，sn_sec 占全文 66%、ie_sec 占 97%（22831 字符），
+    # 其下所有断言实际在拿整篇文档做子串匹配——「章节存在」在章节被删光时依然 PASS。
+    # 3.13.0 逐个改走 sec_body()，3.14.0 回扫确认残余 10 处均为"关键词紧跟标题锚点"
+    # 的安全形态；但靠人眼回扫不可持续，故立此静态防线：关键词前出现通配即判危险。
+    try:
+        _self = os.path.abspath(__file__)
+        _bad = []
+        for _n, _l in enumerate(open(_self, encoding='utf-8').read().split('\n'), 1):
+            if '(?=' in _l and re.search(r'\^#\{1,4\}\s+\.\*', _l):
+                _bad.append(_n)
+        r.append(('回归脚本无跨行文取段正则(标题符后禁.*关键词)', not _bad,
+                  '' if not _bad else 'L' + ','.join(map(str, _bad))))
+    except Exception as e:
+        r.append(('回归脚本无跨行文取段正则(标题符后禁.*关键词)', False, str(e)[:50]))
     r.append(('docs/ 自定义目录已移除', not os.path.exists(os.path.join(root, 'docs'))))
     # 打包器不得硬编码入包白名单（细则层会持续增长，白名单必然漏包）
     bp = os.path.join(root, 'scripts', 'build_package.py')
