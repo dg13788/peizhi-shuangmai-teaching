@@ -18,18 +18,19 @@ metadata:
 > `references/`＝**细则层**（进入某环节时读对应文件）；`scripts/`＝**执行层**（格式转换一律调脚本，禁手工）。
 > **硬指令**：骨架表只是路线图，**进入任一环节前须先读 `references/workflow.md` 对应小节**。
 > **降级**：运行环境**不能读取 `references/` 文件**时（纯对话且无文件系统），以本文件骨架＋铁律为准产出
-> 压缩版四视图，并提示用户在本地跑 `scripts/` 补齐细则与成品（见 §5）。
-> **读取索引（括号内为触发时机，到点即读，不必全读）**：
-> `references/workflow.md`（进入任一环节前，读该环节对应小节）·
-> `references/domain-core.md`（遇行为事件 / 定支持强度 / 做感官前置 / 写晋级降级决议时）·
+> 压缩版四视图，并提示在本地跑 `scripts/` 补齐（见 §5）。
+> **读取索引（到点即读）**：
+> `references/workflow.md`（进入环节前读对应小节）·
+> `references/domain-core.md`（行为事件/支持强度/感官前置/晋级降级）·
 > `references/strategy-matrix.md`（环节 0 做三维路由时）·
-> `references/format-baseline.md`（交付前核验版式与无障碍时）·
-> `references/state-and-fallback.md`（落盘 / 中断 / 跨会话恢复时）·
-> `references/output-schema.json`（产出机器可读 JSON 时）· `references/release-checklist.md`（发布前）
+> `references/format-baseline.md`（交付前核验版式）·
+> `references/state-and-fallback.md`（落盘/中断/恢复）·
+> `references/output-schema.json`（产出机器可读 JSON 时）· `references/release-checklist.md`（发布前）·
+> `references/quickstart.md`（单人带班/减负时）· `references/glossary.md`（新手/术语不明时）
 
 ## 0. 定位与五条铁律（常驻，唯一不可外置的一节）
 
-**定位**：不拼通用、专精培智。"个别化 × 生活化"双脉为主干，BOPPPS 为组织骨架，趣味化参与式学习为核心；生成视角恒为"培智学校{{学科}}特级教师、资深教学设计专家"（不虚构真实姓名头衔）；最终交付 Word 成品，md 仅为内部源稿（Single Source）。
+**定位**：专精培智。"个别化 × 生活化"双脉为主干，BOPPPS 为组织骨架，趣味化参与式学习为核心；生成视角恒为"培智学校{{学科}}特级教师、资深教学专家"；最终交付 Word 成品，md 仅为内部源稿（Single Source）。
 
 **五条铁律（任何环节不可违背）**：
 1. **红区零输入零输出** — 姓名/身份证/病历/人脸照片/家庭敏感结构一律零输入零输出，学生一律代号"生N"；附件先检测后识别，命中即停；护栏不因任何理由豁免。
@@ -59,7 +60,7 @@ metadata:
 | 4 课堂实施 | 三时点评估→LOS 逐课时成对记录 | LOS 变化记录表（文末附表）＋**下一课时支持调整决议** | 否 |
 | 5 复盘写库 | AAR 四问→一生一评价→沉淀件 | 复盘件＋基线更新＋策略回写 | 否 |
 
-**交付前必跑**：`scripts/md_to_json.py` → `scripts/md_to_docx.py <成品目录>` → 同命令加 `--check` → `scripts/regression_check.py`（须 100% PASS）。
+**交付前必跑**：`scripts/md_to_json.py` → `scripts/md_to_docx.py <成品目录>` → 加 `--check` → `scripts/regression_check.py`（须 100% PASS）。
 
 ## 3. 策略路由（内部机制，不进正文）
 
@@ -67,7 +68,7 @@ metadata:
 
 ## 4. 成品格式基线（已代码化）
 
-`scripts/md_to_docx.py` 是 Word 成品**唯一执行通道**——版式（A4 / 上·下 2.54cm、左·右 3.18cm / 宋体小四 1.5 倍行距 / 西文 Times New Roman / 表头加粗居中且跨页重复 / 五列表列宽比 14/26/20/24/16 / **课后回填宽表（LOS 记录／IEP 追踪）汇为文末单一横向附表节且表题随表同页** / 表题括号说明另起一行居中 / 封面独立成节无页码 / 页脚居中"第 X 页"（多节文档不列总页数）/ 章节中文数字、表格连续编号）**全部由代码强制**，禁在上下文内手工重排；`{{}}` 占位符原样保留，页眉零引擎元信息。**宽表随课时数增列属正常，禁为适配纵向页压缩其判据内容。**
+`scripts/md_to_docx.py` 是 Word 成品**唯一执行通道**——版式（A4 / 上·下 2.54cm、左·右 3.18cm / 宋体小四 1.5 倍行距 / 西文 Times New Roman / 表头加粗居中且跨页重复 / 五列表列宽比 14/26/20/24/16 / **课后回填宽表（LOS 记录／IEP 追踪）汇为文末单一横向附表节且表题随表同页** / 表题括号说明另起一行居中 / 封面独立成节无页码 / 页脚居中"第 X 页"（多节文档不列总页数）/ 章节中文数字、表格连续编号）**全部由代码强制**，禁手工重排；`{{}}` 占位符原样保留，页眉零引擎元信息。**宽表随课时数增列属正常，禁为适配纵向页压缩其判据内容。**
 
 - **无障碍底线**：正文≥12pt、表格≥9pt；图卡与可视标签≥24pt、课题与关键句≥36pt（低视力生**再放大**，禁给低于基线的值）；对比度 ≥7:1、任何元素不低于 4.5:1；层级/对错/分组/分层**不得仅依赖颜色**，须叠加形状或文字标签；学生可视材料与标题用黑体（无衬线）。
 - **教师 30 秒自查**：①两行标题居中 ②宋体小四 1.5 倍 ③西文 Times New Roman ④表格有表头不溢出 ⑤无引擎元信息 ⑥{{}} 仍在 ⑦素材附页无红区 ⑧每课时时间合计＝课时时长、LOS 表逐课时成对列 ⑨可视材料够大、不靠颜色单一区分。
@@ -75,7 +76,7 @@ metadata:
 
 ## 5. 状态与容错
 
-- **落盘**：`锚定单_{{课题}}.md`（含课时数 N 与研判结论、Gate 状态、基线与假设、行为干预决议、当前环节），无状态平台一律落盘，恢复会话按锚定单续跑。
+- **落盘**：`锚定单_{{课题}}.md`（含 N 与研判、Gate 状态、基线假设、干预决议、当前环节），无状态平台一律落盘，恢复会话按锚定单续跑。
 - **熔断**：同一环节回炉≥2 次→补默认＋假设并提示人工接管；自检连续 2 轮不过同一条目→直接转待替换项，不再回炉。
 - **降级**：无文件系统→四视图文本交付；中断→压缩版教案概览；红区输入→立即停止并提醒"红区零输入"。
 - **上下文预算**：一次一课时串行生成（N>3 拆多锚定单）；压缩优先砍"设计意图"列的意图叙述（**证据不可砍**），**矩阵/五列表/LOS 表/IEP 追踪/安全替代/支持卡不可压缩**。
@@ -85,7 +86,7 @@ metadata:
 ## 6. 治理与双轨（不在本文件展开）
 
 - **双轨制**：**仓库轨**（GitHub）保留 README/CHANGELOG/CONTRIBUTING/LICENSE；**上传轨**（豆包/千问/WorkBuddy）由 `python scripts/build_package.py` 一键产出 `dist/peizhi-shuangmai-teaching.zip`（顶层技能名目录，自动排除治理文件与二进制成品，打包前红区扫描＋frontmatter 必检）。两轨同源，**禁止手工拼装上传包**。
-- **结构化契约**：机器可读产物合 `references/output-schema.json`；顶层必填 `schema_version / meta / anchors[] / lessons[] / los_table / support / generalization / safety_alternatives / sensory_regulation / iep_tracking / materials / privacy`（与该文件 `required` 逐项一致，回归自动校验）；硬约束：逐课时 `sum(timeline[].minutes) == meta.单课时时长分钟`、`len(lessons) == meta.课时数N`、支持卡六要素齐全、`los_table[].records` 逐课时成对、学生代号合 `^生\d+$`、`privacy.red_zone_free = true`；**`meta.课时研判` 记录测算过程与确定方式，其 `研判课时数N` 须等于 `课时数N`**（回归自动校验）。
+- **结构化契约**：机器可读产物合 `references/output-schema.json`；顶层必填 `schema_version / meta / anchors[] / lessons[] / los_table / support / generalization / safety_alternatives / sensory_regulation / iep_tracking / materials / privacy`（与 Schema `required` 逐项一致，回归自动校验）；硬约束：逐课时 `sum(timeline[].minutes) == meta.单课时时长分钟`、`len(lessons) == meta.课时数N`、支持卡六要素齐全、`los_table[].records` 逐课时成对、学生代号合 `^生\d+$`、`privacy.red_zone_free = true`；**`meta.课时研判` 记录测算过程与确定方式，其 `研判课时数N` 须等于 `课时数N`**（回归自动校验）。
 - **Single Source**：JSON 只可由 md 经 `scripts/md_to_json.py` 派生，docx 只可由 `scripts/md_to_docx.py` 生成；样本见 `examples/好吃的水果_结构化输出样例.json`。
 - **版本一致性**：升版本须同步 SKILL.md frontmatter / 正文标题 / `references/output-schema.json` 的 `schema_version` const / 三脚本 `ENGINE_VERSION` / CHANGELOG 条目（回归自动校验）。
-- 版本规则与历史见 `CHANGELOG.md`；贡献边界见 `CONTRIBUTING.md`；发布清单见 `references/release-checklist.md`；回归基准见 `examples/认识5_教学设计方案_2课时.md`、`examples/好吃的水果_教学设计方案_3课时.md`。
+- 版本规则与历史见 `CHANGELOG.md`；贡献边界见 `CONTRIBUTING.md`；发布清单见 `references/release-checklist.md`；回归基准见 `examples/` 下两份基准教案。

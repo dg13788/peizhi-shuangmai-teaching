@@ -1283,11 +1283,16 @@ def check_repo(root, ev):
     # ① 技能标准布局（scripts/ + references/ + examples/）
     r.append(('scripts/ 四脚本齐全(含打包器)', all(os.path.exists(os.path.join(root, 'scripts', f)) for f in
               ('md_to_docx.py', 'md_to_json.py', 'regression_check.py', 'build_package.py'))))
-    # 2.6.0 三层渐进式披露：references/ 承载细则层，七件缺一即断链
+    # 2.6.0 三层渐进式披露：references/ 承载细则层，缺一即断链。
+    # 3.11.0 增至九件（新增 quickstart.md 单人实施版、glossary.md 术语速查），
+    # 件数由本清单推导、断言名随 len 生成，避免后续新增细则时件数名与实不符
     ref_need = ('output-schema.json', 'format-baseline.md', 'release-checklist.md',
-                'domain-core.md', 'workflow.md', 'strategy-matrix.md', 'state-and-fallback.md')
+                'domain-core.md', 'workflow.md', 'strategy-matrix.md', 'state-and-fallback.md',
+                'quickstart.md', 'glossary.md')
     miss_ref = [f for f in ref_need if not os.path.exists(os.path.join(root, 'references', f))]
-    r.append(('references/ 细则层七件齐全', not miss_ref, '缺' + ','.join(miss_ref) if miss_ref else ''))
+    r.append(('references/ 细则层%d件齐全' % len(ref_need), not miss_ref,
+              '缺' + ','.join(miss_ref) if miss_ref else ''))
+    # ②-b 元断言：回归脚本自身禁止再写 "标题符 + .* + 关键词 + lookahead" 的取段正则。
     r.append(('docs/ 自定义目录已移除', not os.path.exists(os.path.join(root, 'docs'))))
     # 打包器不得硬编码入包白名单（细则层会持续增长，白名单必然漏包）
     bp = os.path.join(root, 'scripts', 'build_package.py')
