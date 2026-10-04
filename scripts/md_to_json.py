@@ -369,8 +369,16 @@ def derive(text):
     m_sec = find_sec(secs, '材料清单')
     if m_sec:
         for l in m_sec[2]:
-            if l.strip().startswith('☐'):
-                materials.append(l.strip())
+            if l.strip().startswith('\u2610'):
+                # 3.12.0：材料清单**一条一项**——与 md_to_docx 的版面规则同源
+                # （此前源稿一行串联多个材料 → Word 拼成整段；JSON 亦须同粒度，
+                #  否则 machine-readable 与成品两份对不上）
+                for seg in re.split(r'(?=[\u2610-\u2612])', l.strip()):
+                    seg = seg.strip().strip('；;').strip()
+                    if seg:
+                        # 同上：勾框与正文之间留半角空格（与成品版面同源）
+                        body = seg.lstrip('\u2610\u2611\u2612').strip()
+                        materials.append('\u2610' + (' ' + body if body else ''))
 
     # ---- AAC ----
     aac = []

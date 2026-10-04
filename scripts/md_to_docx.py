@@ -268,6 +268,28 @@ def code_xml(text):
 
 
 # ---------- md 解析 ----------
+# 3.12.0：勾选符号集（U+2610 ☐ / U+2611 ☑ / U+2612 ☒ 为打印安全的单色几何符号，
+# 见回归"成品无 emoji"白名单）。☐ 既是版面勾框，也是 md_to_json.py 的解析锚点。
+CHK = '\u2610'
+CHK_SET = '\u2610\u2611\u2612'
+
+
+def split_chk(line):
+    """勾选行 → **逐条**列表（每条以 ☐ 开头，且每条只含一个 ☐）。
+
+    之前渲染器把它并入通用段落缓冲 → 多行 ☐ 被拼成一个整段；此处改为行＝条，
+    并把行内串联的多个 ☐ 一并拆开，使"每行＝每条"在成品版面恒定成立。"""
+    items = []
+    for seg in re.split('(?=[%s])' % CHK_SET, line):
+        seg = seg.strip().strip('；;').strip()
+        body = seg.lstrip(CHK_SET).strip() if seg else ''
+        if seg:
+            # 勾框与条目正文之间**必须留一个空格**：早期实现用 strip() 连带把
+            # ☐ 后的空格去掉，成品里变成"☐苹果实物"紧贴，勾选框与正文分不开。
+            items.append(CHK + (' ' + body if body else ''))
+    return items
+
+
 def flush(buf, blocks):
     text = ''.join(buf).strip()
     if not text:
@@ -335,6 +357,17 @@ def parse_md(text):
             flush(buf, blocks)
             buf = []
             blocks.append(('li', s[2:].strip()))
+            i += 1
+            continue
+        # 3.12.0：勾选条目（`☐`）**强制一行一条**。
+        # 此前 ☐ 行落入通用缓冲 → 被 flush() 连同邻接行拼成一个 400 余字的整段，
+        # 且相邻两行之间连空格都没有（材料首尾直接粘连），教师无法逐项勾核；
+        # 行内含多个 ☐ 时（如家长记录条五档横排）同样按 ☐ 拆为多条，保证成品版面恒为"条＝行"。
+        if s.startswith(CHK):
+            flush(buf, blocks)
+            buf = []
+            for item in split_chk(s):
+                blocks.append(('chk', item))
             i += 1
             continue
         buf.append(s)
@@ -412,6 +445,10 @@ def render_body(cover, blocks):
             return para(val, style=HEAD_STYLE[kind])
         if kind == 'li':
             return para('· ' + val, left=420, hang=420, line=360, after=60)
+        if kind == 'chk':
+            # 3.12.0 勾选条目：独占一段（此前多行 ☐ 被并入同一段落，无法逐项勾核）；
+            # 左缩进 360twips 使勾框列齐出血与正文，行距收紧保持清单感。
+            return para(val, left=360, line=320, after=40)
         if kind == 'quote':
             # 口径/注释层：楷体五号、左缩进、浅底，与正文明确分层（字号 10.5pt ≥ 9pt 基线）
             return para(val, sz=21, ea='楷体', left=360, line=360,

@@ -179,7 +179,11 @@ def check(path):
         r.append(('LOS变化记录表存在', False))
 
     # 7 材料清单 ☐ 勾选
-    seg = text.split('材料清单')[1][:600] if '材料清单' in text else ''
+    # 3.12.0：截取窗口由"固定 600 字符"改为**整节**。此前 600 字窗口在材料清单
+    #   一条一项（7 行→27 条）后把"家长记录条"条目切在窗口之外 → 该条被删也照样 PASS、
+    #   完好却误报 FAIL。固定长度窗口是脆弱写法，一律按结构边界取段。
+    ms_sec = re.search(r'^### 材料清单.*?\n(.*?)(?=^### |^## |\Z)', text, re.M | re.S)
+    seg = ms_sec.group(1) if ms_sec else ''
     r.append(('材料清单含☐勾选框', '☐' in seg))
     # 3.6.0：教学过程向学生发家长记录条 → 材料清单必须列，否则课前照单核对必然漏带
     if '家长记录条' in text:
@@ -1108,6 +1112,24 @@ def check_docx(root):
                   doc_wide == wide_table_count(text),
                   'docx%d/md%d' % (doc_wide, wide_table_count(text))))
 
+        # ③a 3.12.0：勾选条目（☐）**逐条独立成段**契约。
+        #   此前多个 ☐ 行被解析缓冲拼成一个整段（相邻两项之间甚至没有分隔符），
+        #   教师无法逐项打勾；规则同
+        #   时为"一行写多个 ☐"兜底——生成器按 ☐ 拆条，故成品段落数须等于源稿 ☐ 总数，
+        #   且每段只允许一个 ☐（数量对得上≠形态对：段落合并会让计数相符但版面仍然挤）。
+        chk_par = []
+        for m in re.finditer(r'<w:p(?: [^>]*)?>(.*?)</w:p>', doc, re.S):
+            t = ''.join(re.findall(r'<w:t[^>]*>([^<]*)</w:t>', m.group(1))).strip()
+            if '\u2610' in t:
+                chk_par.append(t)
+        n_chk_md = text.count('\u2610')
+        r.append((tag + ' 勾选条目逐条独立成段(一段一条)',
+                  len(chk_par) == n_chk_md
+                  and all(t.count('\u2610') == 1 for t in chk_par),
+                  '成品%d条/源稿%d个，多框段%d'
+                  % (len(chk_par), n_chk_md,
+                     sum(1 for t in chk_par if t.count('\u2610') > 1))))
+
         # ③a' 3.4.0：表题—表格同页契约。此前表题属前一纵向节、宽表进横向节（新页起），
         #      表题被孤零零留在上一页；现由生成器把表题挂起、随表落入同一节。
         md_caps = re.findall(r'^\*\*((?:表\d+|附)[^\n]*?)\*\*\s*$', text, re.M)
@@ -1213,6 +1235,29 @@ def check_docx(root):
                                             if len(row.cells) == 5)))
         except ImportError:
             pass
+
+    # ⑤ 3.12.0 渲染器契约（**不依赖样例源稿形态**的独立探针）
+    #   样例源稿的 ☐ 条目之间带空行，这会掩盖渲染器是否真的处理了 ☐
+    #   （反向变异已证：把 chk 分支改坏，样例成品仍能照样通过）。
+    #   故另以**最坏形态源稿**直驱生成器：① 连续 ☐ 行之间**无空行**（md 软换行，
+    #   通用解析器会并成一段）② 一行串联多个 ☐ —— 两种形态都必须落成一条一段。
+    probe = ('### 材料清单\n\n'
+             '☐ 甲材料 1 个【采购】（助教摆位）\n'
+             '☐ 乙材料 2 个【自制】（主教示范）\n'
+             '☐ 丙道具【自制】　☐ 丁卡片【采购】（同行两项）\n')
+    try:
+        pxml = zipfile.ZipFile(__import__('io').BytesIO(
+            G.build_docx_bytes(probe))).read('word/document.xml').decode('utf-8')
+        ppar = []
+        for m in re.finditer(r'<w:p(?: [^>]*)?>(.*?)</w:p>', pxml, re.S):
+            t = ''.join(re.findall(r'<w:t[^>]*>([^<]*)</w:t>', m.group(1))).strip()
+            if '\u2610' in t:
+                ppar.append(t)
+        r.append(('渲染器契约：最坏形态源稿仍逐个 ☐ 独立成段',
+                  len(ppar) == 4 and all(t.count('\u2610') == 1 for t in ppar),
+                  '成品%d段(应4)' % len(ppar)))
+    except Exception as e:
+        r.append(('渲染器契约：最坏形态源稿仍逐个 ☐ 独立成段', False, str(e)[:40]))
     return r
 
 
