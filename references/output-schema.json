@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://peizhi-shuangmai-teaching.local/schemas/output-schema.json",
   "title": "培智·双脉教学引擎 结构化教案输出契约",
-  "description": "机器可读教案输出契约（V3.3.0）。硬约束：①逐课时 sum(lessons[].timeline[].minutes) == meta.单课时时长分钟；②len(lessons) == meta.课时数N；③los_table 每生 records 逐课时成对且长度 == meta.课时数N；④support.behavior_card 六要素齐全；⑤学生一律代号，privacy.red_zone_free 必须为 true；⑥meta.课时研判.研判课时数N == meta.课时数N（课时数由引擎研判，非默认/非用户输入）。本文件不由服务端强校验，由 scripts/regression_check.py 执行等价断言。",
+  "description": "机器可读教案输出契约（版本号以 schema_version.const 为唯一权威，此处不自述）。硬约束：①逐课时 sum(lessons[].timeline[].minutes) == meta.单课时时长分钟；②len(lessons) == meta.课时数N；③los_table 每生 records 逐课时成对且长度 == meta.课时数N；④support.behavior_card 六要素齐全；⑤学生一律代号，privacy.red_zone_free 必须为 true；⑥meta.课时研判.研判课时数N == meta.课时数N（课时数由引擎研判，非默认/非用户输入）。本文件不由服务端强校验，由 scripts/regression_check.py 执行等价断言。",
   "type": "object",
   "required": [
     "schema_version",
@@ -416,7 +416,7 @@
     "sensory_regulation": {
       "type": "array",
       "title": "感官调节与环境安排（课前必做）",
-      "description": "PBS 前因调整的前置层：先把噪声/光线/座位/口欲过敏/触觉五个维度的环境刺激降到位，再谈任务与强化。须覆盖五个维度，每条含触发信号→前置安排→课中降刺激通道。",
+      "description": "PBS 前因调整的前置层：先把环境刺激降到学生能学的水平，再谈任务与强化。必载五维＝听觉/视觉/前庭与座位/口欲与过敏/触觉与材料；**感官为六维**（domain-core §4），教学过程用到嗅觉（闻到气味）时必须增补嗅觉行，否则气味过敏与掩鼻回避毫无前置安排。含品尝或进食环节时，味觉与质地防御的前置安排须并入「口欲与过敏」行写明。每条含触发信号→前置安排→课中降刺激通道。行数须与源稿感官表行数一致，禁在派生中丢弃行。",
       "minItems": 5,
       "items": {
         "type": "object",
@@ -424,7 +424,7 @@
         "properties": {
           "维度": {
             "type": "string",
-            "enum": ["听觉", "视觉", "前庭与座位", "口欲与过敏", "触觉与材料"]
+            "enum": ["听觉", "视觉", "前庭与座位", "口欲与过敏", "触觉与材料", "嗅觉"]
           },
           "触发信号": { "type": "string" },
           "前置安排": { "type": "string", "description": "上课前完成的环境安排" },

@@ -26,9 +26,15 @@ def report_path(name):
     os.makedirs(REPORT_DIR, exist_ok=True)
     return os.path.join(REPORT_DIR, name)
 
+# 感官维度映射（domain-core §4 感官六维，3.13.0 补齐嗅觉）。
+# 教训：3.7.0 已把感官表升为六维并写入 domain-core/glossary，但本表仍停在五维，
+# 导致 md 里的「嗅觉（气味）」行匹配失败被 `continue` 静默丢弃——而 JSON 恰恰因为少一条
+# 才满足下游 `set(...)=={五维}` 的硬相等断言，**丢数据却被验证为通过**。
+# 故本表必须覆盖 domain-core §4 的全部六个维度，且下方解析改为「不再静默丢弃」。
 SENSORY_MAP = [
     ('听觉', '听觉'), ('视觉', '视觉'), ('前庭', '前庭与座位'),
     ('口欲', '口欲与过敏'), ('过敏', '口欲与过敏'), ('触觉', '触觉与材料'),
+    ('嗅觉', '嗅觉'), ('气味', '嗅觉'),
 ]
 
 
@@ -434,7 +440,10 @@ def derive(text):
                         dim = val
                         break
                 if not dim:
-                    continue
+                    # Single Source 硬要求：md 的每一行都必须落到 JSON，禁在派生途中静默消失。
+                    # 映射表未收录的维度按原值保留（去掉括号说明），让它在下游 schema
+                    # 校验里显性报错（提示同步 enum），而不是无声蒸发。
+                    dim = re.sub(r'（[^）]*）', '', r[0]).strip()
                 sensory.append({'维度': dim, '触发信号': r[1], '前置安排': r[2], '降刺激通道': r[3]})
 
     # ---- IEP 累计追踪 ----

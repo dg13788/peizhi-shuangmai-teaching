@@ -60,11 +60,87 @@ def cells(row):
     return [c.strip() for c in row.strip().strip('|').split('|')]
 
 
+# 感官必载维度（domain-core §4 感官六维中的五条基底线＋条件必载的嗅觉）。
+# 与 scripts/md_to_json.py 的 SENSORY_MAP 同源：本常量是 md 侧与 JSON 侧共用的
+# 唯一口径，避免两边各写一份短名/全名而出现"两边一致地错"的盲区。
+SENSORY_BASE = ['听觉', '视觉', '前庭', '口欲', '触觉']
+SENSORY_EXTRA = ['嗅觉']
+
+
+def sec_body(text, key):
+    """按小节边界（标题行扫描）取正文——两层禁忌：
+    ① 禁用 `text.split(key)[1][:600]` 固定长度窗口：3.12.0 已发生过内容变长后
+       把目标切出窗口、"内容完好却误报 FAIL" 的事故；
+    ② 禁用「正则 lookahead + re.S」写法：`.*` 在 re.S 下跨 POSIX 行，
+       负向前瞻会一路吃到文末而失效（3.13.0 当场复现：感官小节抓回了整本文档表格）。"""
+    lines = text.replace('\r\n', '\n').split('\n')
+    head = None
+    for i, l in enumerate(lines):
+        if re.match(r'^#{1,4}\s', l) and key in l:
+            head = i
+            break
+    if head is None:
+        return ''
+    out = [lines[head]]
+    for j in range(head + 1, len(lines)):
+        if re.match(r'^#{1,4}\s', lines[j]):
+            break
+        out.append(lines[j])
+    return '\n'.join(out)
+
+
+def material_section_body(text):
+    """取「材料清单」小节全文（供闭环断言定位，避免全文子串被别处同名词兜住）。"""
+    return sec_body(text, '材料清单')
+
+
+def md_sensory_rows(md_path):
+    """从源稿 md 读出感官表各行的**标准化维度名**（行数即真值来源）。
+    3.13.0：没有这个函数之前，"JSON 是否丢行"根本无从判定——两边都停在五维、
+    硬相等还恰好成立，缺陷被自己的校验保护了整整 6 个版本。"""
+    if not md_path or not os.path.exists(md_path):
+        return []
+    try:
+        txt = open(md_path, encoding='utf-8').read()
+    except Exception:
+        return []
+    body = sec_body(txt, '感官调节')
+    rows = []
+    for rw in body.splitlines():
+        s = rw.strip()
+        if not s.startswith('|') or is_sep(s):
+            continue
+        c0 = cells(s)[0].strip()
+        if not c0 or c0 == '感官/环境维度':
+            continue
+        rows.append(re.sub(r'（[^）]*）', '', c0).strip())
+    # 归一到 JSON 侧口径
+    norm = {'听觉': '听觉', '视觉': '视觉', '前庭与座位站位': '前庭与座位',
+            '口欲与过敏': '口欲与过敏', '触觉与材料取用': '触觉与材料', '嗅觉': '嗅觉'}
+    out = []
+    for x in rows:
+        hit = None
+        for k, v in norm.items():
+            if x.startswith(k) or k.startswith(x):
+                hit = v
+                break
+        out.append(hit or x)
+    return out
+
+
 def check(path):
     name = os.path.basename(path)
     text = open(path, encoding='utf-8').read()
     lines = text.splitlines()
     r = []
+
+    # 3.13.0：交付稿是给教师、教务与家长看的正式文书，**成品零引擎元信息**
+    # （md_to_docx 连文档属性的作者/版本/生成工具都不写）。上一轮却在家长记录条节
+    # 写进了"（3.12.0；…"——教师在正式教案里看到一串引擎版本号，既不知所谓，
+    # 也把变更日志的口径带进了交付物。此处双重防御：md 不得有、docx 不得有。
+    ver_in_md = re.findall(r'\b3\.\d+\.\d+\b', text)
+    r.append(('交付稿不含引擎版本号(成品零引擎元信息)', not ver_in_md,
+              '' if not ver_in_md else '出现:%s' % ','.join(sorted(set(ver_in_md))[:3])))
 
     m = re.search(r'_(\d)课时', name)
     # 课时数变量特意命名为 n_less：本节后续约 300 行都依赖它，
@@ -462,29 +538,61 @@ def check(path):
     r.append(('危机处置禁忌齐全(4条)', not taboo, ','.join(taboo)))
 
     # ===== 2.4.0 新增：五维感官调节前置 =====
-    sn_sec = ''
-    # 末节收尾时用 \Z 兜底：3.5.0 起 IEP 附表已是文档最后一个小节，其后不再有 ^## / ^### 可锚
-    msn = re.search(r'^### .*感官调节.*?(?=^## |^### (?!.*感官调节)|\Z)', text, re.M | re.S)
-    if msn:
-        sn_sec = msn.group(0)
-    r.append(('感官调节章节存在', bool(sn_sec)))
-    dims = ['听觉', '视觉', '前庭', '口欲', '触觉']
+    # 3.13.0 重大修正：原写 re.search(r'^### .*感官调节.*?(?=^## |^### (?!.*感官调节)|\Z)',
+    # re.M|re.S)。re.S 让 `.*` 跨越换行——于是它从**文档第一个 ### 标题**就开吃，一路
+    # 吞到文末，实测 sn_sec 占全文 63%~66%。后果是下面「章节存在／五维齐全／非惩罚性」
+    # 三条断言全在拿**整篇文档**做子串匹配，感官表删空照样 PASS——装饰性断言。
+    # 这与 3.13.0 早些时候修 sec_body 时踩的是同一个坑（re.S＋lookahead），
+    # 当时只修了 sec_body 没回头清 sn_sec。一律改走 sec_body 的结构行扫描。
+    sn_sec = sec_body(text, '感官调节')
+    # 感官六维（domain-core §4；3.13.0 从"五维"纠正为"六维"——
+    # 此前本表停在五维、md_to_json 的 SENSORY_MAP 也停在五维，两边"一致地错了"，
+    # 于是"少一条"反而满足下游硬相等断言，缺陷被自己的校验保护起来）。
+    # 必载五维是下限；用到哪个通道就须有哪行，故嗅觉为条件必载。
+    # 注意 detail 一律只在失败时给原因——PASS 时若吐"缺…"会被误读为未通过。
+    dims = SENSORY_BASE
     miss_d = [d for d in dims if d not in sn_sec]
-    r.append(('感官五维度齐全', not miss_d, '缺' + ','.join(miss_d) if miss_d else ''))
+    r.append(('感官必载五维齐全', not miss_d, '' if not miss_d else '缺' + ','.join(miss_d)))
     sn_tbl = [b for b in bs if b and cells(b[0]) and cells(b[0])[0] == '感官/环境维度']
+    sn_rows = [cells(rw)[0].strip() for b in sn_tbl
+               for rw in b[1:] if cells(rw) and cells(rw)[0].strip()
+               and not is_sep(rw)]
+    # 行数守恒是防"派生静默丢行"的第一道闸：md 有几行，JSON 就必须有几条
+    r.append(('感官表行数≥必载五维', len(sn_rows) >= len(dims),
+              '' if len(sn_rows) >= len(dims) else '实%d行<%d' % (len(sn_rows), len(dims))))
+    r.append(('感官调节章节存在', bool(sn_sec)))
     r.append(('感官调节表四列(维度/触发/前置/降刺激通道)',
               bool(sn_tbl) and len(cells(sn_tbl[0][0])) == 4, '' if sn_tbl else '缺表'))
     r.append(('降刺激通道非惩罚性(无"隔离"作唯一通道)',
               bool(sn_sec) and '惩罚性' in sn_sec))
     # 3.6.0：教学过程用到"闻"（多感官课常见）→ 感官表须有嗅觉维度，否则气味过敏无前置安排
     if re.search(r'[“"]?闻[”"]?（|闻一闻|闻气味|—闻—', text):
-        r.append(('用"闻"则感官表含嗅觉维度', '嗅觉' in sn_sec, '缺嗅觉'))
+        has_smell = any('嗅觉' in x or '气味' in x for x in sn_rows)
+        r.append(('用"闻"则感官表含嗅觉维度', has_smell,
+                  '' if has_smell else '缺嗅觉维度行'))
+    # 3.13.0：有品尝/进食环节的课程，味觉与质地防御须在口欲与过敏行写明——
+    # PBS 卡里已记"品尝环节的吐出与拒食"为触发信号，感官前置却无对应安排＝信号与应对脱节
+    # 触发词须排除通用红线里的"禁止强制进食"（那是 PBS 卡四条红线之一，几乎所有课都有，
+    # 与是否真有品尝环节无关）——故用 `[^制]进食` 排除"强制进食"。
+    if re.search(r'品尝|尝一尝|试吃|吃一口|[^制]进食', text):
+        oral = ''.join(x for x in sn_rows if '口欲' in x or '味' in x)
+        miss_taste = [k for k in ('质地', '吐出', '强制') if k not in oral and k not in sn_sec]
+        r.append(('含品尝环节→味觉质地前置齐全', not miss_taste,
+                  '' if not miss_taste else '缺' + ','.join(miss_taste)))
+    # 3.13.0：感官节提到的安全配具（牙胶等）必须在材料清单，否则课前照单核对必然漏带
+    # 3.13.0：牙胶与"替代咀嚼物"是同一件配具的两种叫法（感官节常写"配牙胶或替代咀嚼物"，
+    # 材料清单则列在"牙胶"条下、把咀嚼物写在【替代：…】里）。按名逐字比对会把合规写法判违规，
+    # 故按**配具组**判定：感官节提到任一种叫法，材料清单出现任一种即可。
+    if any(g in sn_sec for g in ('牙胶', '咀嚼物')):
+        m_body = material_section_body(text)
+        hit_gear = any(g in m_body for g in ('牙胶', '咀嚼'))
+        r.append(('感官节提到咀嚼配具→材料清单须列(牙胶/咀嚼物)', hit_gear,
+                  '' if hit_gear else '材料清单未列牙胶或咀嚼物'))
 
     # ===== 2.4.0 新增：IEP 长期目标跨课时累计追踪 =====
-    ie_sec = ''
-    mie = re.search(r'^### .*IEP.*?(?=^## |^### (?!.*IEP)|\Z)', text, re.M | re.S)
-    if mie:
-        ie_sec = mie.group(0)
+    # 3.13.0 同 sn_sec 那一处，同属"re.S 让 .* 跨行"的坑：实测占全文 **97%**，
+    # 于是本小节下所有 IEP 断言（表存在／累计口径／生N 代号…）都在拿整篇文档做子串匹配。
+    ie_sec = sec_body(text, 'IEP')
     r.append(('IEP累计追踪章节存在', bool(ie_sec)))
     ie_tbl = [b for b in bs if b and '年度长期目标' in b[0]]
     r.append(('IEP追踪表含年度长期目标列', bool(ie_tbl)))
@@ -502,13 +610,13 @@ def check(path):
     # 这些已由 scripts/md_to_docx.py 代码固化、且引擎铁律禁止手工重排 → 对教师零信息量，
     # 且"无引擎元信息/{{}} 占位符保留"属内部工作流语言，会随 Word 外发。故缩减为约束
     # **教师另外制作的可视教具**（图卡/投屏/板书大字卡/打印学习单）的规格，归入配套件节。
-    ma = re.search(r'^### .*学生可视材料规格.*?(?=^## |^### (?!.*学生可视材料规格))',
-                   text, re.M | re.S)
-    acc_sec = ma.group(0) if ma else ''
+    # 3.13.0：同为 re.S 跨行取段缺陷（`^### .*学生可视材料规格` 会先匹配到文档首个 ### 再跨行找词）
+    acc_sec = sec_body(text, '学生可视材料规格')
     in_kit = bool(re.search(r'^## [一二三四五六七八九十]+、配套件.*?^### .*学生可视材料规格',
                             text, re.M | re.S))
     r.append(('学生可视材料规格存在且归入配套件下(三级标题)', bool(acc_sec) and in_kit,
-              '缺三级标题' if not acc_sec else '未归入配套件'))
+              '' if (acc_sec and in_kit) else
+              ('缺三级标题' if not acc_sec else '未归入配套件')))
     legacy = re.search(r'^## [一二三四五六七八九十]+、排版与无障碍', text, re.M)
     r.append(('已无独立"排版与无障碍执行说明"大节(防回流)', not legacy))
     leak = [k for k in ('12pt', '小四', 'A4', '页边距', '页脚居中页码', '{{}} 占位符保留')
@@ -591,9 +699,16 @@ def check_schema(root, ev=''):
     r.append(('Schema anchors 为多锚点数组', anc.get('type') == 'array' and set(anc_req) == {'板块', '条目', '表述'}))
     sd = sensory.get('items', {}).get('required', [])
     r.append(('Schema 感官调节四字段', set(sd) == {'维度', '触发信号', '前置安排', '降刺激通道'}, str(sd)))
-    r.append(('Schema 感官调节≥5维度', sensory.get('minItems') == 5 and
-              set(sensory.get('items', {}).get('properties', {}).get('维度', {}).get('enum', [])) ==
-              {'听觉', '视觉', '前庭与座位', '口欲与过敏', '触觉与材料'}))
+    sdim_enum = sensory.get('items', {}).get('properties', {}).get('维度', {}).get('enum', [])
+    # 3.13.0：原为 enum == 五维 的硬相等，导致给 enum 补一个合法维度（嗅觉）就会被判违规。
+    # 感官是六维（domain-core §4），必载五维是下限而非全集，故改为"必载⊆enum"。
+    base_enum = {'听觉', '视觉', '前庭与座位', '口欲与过敏', '触觉与材料'}
+    r.append(('Schema 感官维度枚举含必载五维',
+              sensory.get('minItems') == 5 and base_enum <= set(sdim_enum),
+              '' if base_enum <= set(sdim_enum) else 'enum=%s' % sdim_enum))
+    r.append(('Schema 感官枚举含嗅觉(六维贯通)',
+              '嗅觉' in set(sdim_enum),
+              '' if '嗅觉' in set(sdim_enum) else 'enum 停在五维——与 domain-core §4 六维不一致'))
     idf = iep.get('items', {}).get('required', [])
     r.append(('Schema IEP 追踪五字段',
               set(idf) == {'学生代号', '年度长期目标', '本课短期目标', '分课时达成', '累计口径'}, str(idf)))
@@ -605,126 +720,195 @@ def check_schema(root, ev=''):
         bc = []
     r.append(('Schema 行为支持卡六要素', len(bc) == 6, str(len(bc))))
 
-    jf = glob.glob(os.path.join(root, 'examples', '*结构化输出样例.json'))
+    # 3.13.0：原写 `data = json.load(open(jf[0]))` —— **只校验了第一个样例**，
+    # 仓库里有两份基准教案，第二份从未进入契约校验，其 schema 违规不会被任何断言发现。
+    # 且 glob 顺序不定，被跳过的是哪一份都不确定。改为遍历全部样例。
+    jf = sorted(glob.glob(os.path.join(root, 'examples', '*结构化输出样例.json')))
     if not jf:
         return r + [('存在结构化输出样例', False)]
-    try:
-        data = json.load(open(jf[0], encoding='utf-8'))
-        r.append(('JSON 样例为合法 JSON', True))
-    except Exception as e:
-        return r + [('JSON 样例为合法 JSON', False, str(e))]
+    r.append(('结构化样例数≥1且全部纳入校验', len(jf) >= 1, '%d 份' % len(jf)))
 
-    r.append(('JSON schema_version 符合引擎版本', data.get('schema_version') == ev,
-              'JSON=%s SKILL=%s' % (data.get('schema_version'), ev)))
-    miss_top = [k for k in top if k not in data]
-    r.append(('JSON 顶层字段无缺失', not miss_top, '缺' + ','.join(miss_top) if miss_top else ''))
-    # SKILL.md §6 声明的顶层字段集合必须与 Schema required 一致（防文档与契约漂移）
+    def md_of(jpath):
+        """样例 JSON → 对应源稿 md（同前缀），供 md↔JSON 交叉断言使用。"""
+        stem = os.path.basename(jpath).replace('_结构化输出样例.json', '')
+        hit = glob.glob(os.path.join(root, 'examples', stem + '_教学设计方案*.md'))
+        return hit[0] if hit else ''
+
+    def one(data, tag, md_path):
+        rr = []
+        n = data['meta']['课时数N']
+        dur = data['meta']['单课时时长分钟']
+        lessons = data['lessons']
+
+        miss_top = [k for k in top if k not in data]
+        rr.append((tag + ' JSON 顶层字段无缺失', not miss_top, '缺' + ','.join(miss_top) if miss_top else ''))
+        ancs = data.get('anchors', [])
+        rr.append((tag + ' JSON 多锚点且每条三级齐全',
+                  len(ancs) >= 1 and all(all(a.get(k) for k in ('板块', '条目', '表述')) for a in ancs),
+                  '%d条' % len(ancs)))
+
+        n = data['meta']['课时数N']
+        dur = data['meta']['单课时时长分钟']
+        lessons = data['lessons']
+        rr.append((tag + ' JSON lessons 数 == 课时数N', len(lessons) == n, '%d/%d' % (len(lessons), n)))
+
+        # ===== 3.1.0 新增：课时量研判（课时数由引擎研判，非默认 1 课时、非用户输入）=====
+        jg = data.get('meta', {}).get('课时研判', {})
+        jk = ['研判身份', '基础时长分钟', '复现系数', '分层系数', '有效利用时长分钟',
+              '测算课时数', '学科校验锚', '研判课时数N', '确定方式', '研判依据']
+        miss_j = [k for k in jk if not jg.get(k)]
+        rr.append((tag + ' JSON meta.课时研判 十项齐全', not miss_j, '缺' + ','.join(miss_j) if miss_j else ''))
+        rr.append((tag + ' 研判身份为双身份(学科专家＋特级教师)',
+                  '资深教学专家' in jg.get('研判身份', '') and '特级教师' in jg.get('研判身份', '')))
+        rr.append((tag + ' JSON 研判课时数N == 课时数N', jg.get('研判课时数N') == n,
+                  '%s/%s' % (jg.get('研判课时数N'), n)))
+        rr.append((tag + ' 确定方式属合法枚举(直定/确认)',
+                  jg.get('确定方式') in ('轻打扰直定', '输出确认'), str(jg.get('确定方式'))))
+        b, rc, lc, ef, calc = (jg.get('基础时长分钟'), jg.get('复现系数'), jg.get('分层系数'),
+                               jg.get('有效利用时长分钟'), jg.get('测算课时数'))
+        num_ok = all(isinstance(x, (int, float)) and x for x in (b, rc, lc, ef, calc))
+        if num_ok:
+            want = b * rc * lc / ef
+            rr.append((tag + ' 测算式可复核(基础×复现×分层÷有效≈测算值)', abs(want - calc) < 0.02,
+                      '%.2f vs %s' % (want, calc)))
+            rr.append((tag + ' 研判N == ceil(测算值)', n == int(calc) + (1 if calc % 1 else 0),
+                      'N=%d 测算=%s' % (n, calc)))
+            rr.append((tag + ' 复现/分层系数在规定区间', 1.2 <= rc <= 1.5 and 1.1 <= lc <= 1.3,
+                      '复现%s 分层%s' % (rc, lc)))
+            rr.append((tag + ' 有效利用时长 == 单课时时长×0.75(±1)', abs(ef - dur * 0.75) <= 1,
+                      '%s vs %s' % (ef, dur * 0.75)))
+            margin = (n - calc) / n
+            rr.append((tag + ' 双出口判定自洽(余量>10%且N≤3 ⇔ 轻打扰直定)',
+                      (margin > 0.10 and n <= 3) == (jg.get('确定方式') == '轻打扰直定'),
+                      '余量%.0f%% N=%d %s' % (margin * 100, n, jg.get('确定方式'))))
+            # 3.14.0 出口凭证：判定不许只落在研判表里。示范件曾判定"输出确认（随 Gate-A
+            # 一并确认）"而成品零 Gate-A 落点——教的是一条"说要停等却径直跑完"的路径。
+            _md2 = open(md_path, encoding='utf-8').read() if md_path and os.path.exists(md_path) else ''
+            _has_gate = bool(re.search(r'^\*\*Gate-A 确认记录', _md2, re.M))
+            _conf = jg.get('确定方式') == '输出确认'
+            rr.append((tag + ' 输出确认出口⇒有Gate-A确认记录块',
+                      _has_gate if _conf else True,
+                      '出口=%s Gate-A块=%s' % (jg.get('确定方式'), _has_gate)))
+            rr.append((tag + ' 轻打扰直定出口⇒无Gate-A块(防双出口混淆)',
+                      not _has_gate if not _conf else True,
+                      '出口=%s Gate-A块=%s' % (jg.get('确定方式'), _has_gate)))
+            if _has_gate:
+                _gb = _md2.split('Gate-A 确认记录', 1)[1][:1200]
+                rr.append((tag + ' Gate-A块含四要素(事项/备选/确认结果/结论)',
+                          all(k in _gb for k in ('确认事项', '备选项', '确认结果', '确认后结论'))))
+                rr.append((tag + ' Gate-A确认结果留占位符(待教师填)',
+                          '{{' in _gb and '}}' in _gb))
+                # 锚点必须限定到结构位置：全文 + "待替换项与假设清单" 的首现其实落在
+                # Gate-A 块正文里（那句"登录下方…"），用 split(…)[-1] 会切的文档中部——
+                # 同名词被别处兜住是本项目反复复发的老病，一律走 sec_body 按节边界取。
+                _hb = sec_body(_md2, '待替换项与假设清单')
+                rr.append((tag + ' Gate-A与假设清单相互指引',
+                          bool(_hb) and 'Gate-A' in _hb,
+                          '' if _hb else '未定位到假设清单节'))
+        else:
+            rr.append((tag + ' 测算式可复核(基础×复现×分层÷有效≈测算值)', False, '研判字段非数值'))
+
+        needed = {'B', 'O', 'P前', 'P参', 'P后', 'S'}
+        steps_ok, time_ok, matrix_ok, inq_ok = True, True, True, True
+        detail = []
+        for ls in lessons:
+            steps = set(x['step'] for x in ls['timeline'])
+            s = sum(x['分钟'] for x in ls['timeline'])
+            if not needed <= steps:
+                steps_ok = False
+            if s != dur:
+                time_ok = False
+            if len(ls['objectives_matrix']) < 9:
+                matrix_ok = False
+            if len(ls['inquiry_activities']) < 1:
+                inq_ok = False
+            detail.append('L%d=%d' % (ls['课时序号'], s))
+        rr.append((tag + ' JSON 每课时 BOPPPS 六步齐全', steps_ok))
+        rr.append((tag + ' JSON 每课时分钟合计==%d' % dur, time_ok, ' '.join(detail)))
+        rr.append((tag + ' JSON 每课时目标矩阵≥9格', matrix_ok))
+        rr.append((tag + ' JSON 每课时探究活动≥1', inq_ok))
+
+        los_ok, code_ok = True, True
+        for row in data['los_table']:
+            recs = row['records']
+            if len(recs) != n:
+                los_ok = False
+            if any(('起始LOS' not in x or '达成LOS' not in x) for x in recs):
+                los_ok = False
+            if not re.match(r'^生\d+$', row['学生代号']):
+                code_ok = False
+        rr.append((tag + ' JSON LOS 逐生逐课时成对', los_ok, '%d人' % len(data['los_table'])))
+        rr.append((tag + ' JSON 学生一律代号(红区合规)', code_ok))
+
+        sup = data['support']
+        keys = {'触发信号', '前因调整', '替代行为', '强化计划', '危机处置', '全员一致要求'}
+        rr.append((tag + ' JSON 行为支持卡六要素', keys <= set(sup['behavior_card'])))
+        rr.append((tag + ' JSON 含晋级降级阈值规则', len(sup.get('progression_rules', {})) >= 5))
+        rr.append((tag + ' JSON 泛化三场景齐全', all(data['generalization'].get(k) for k in ('家庭', '学校', '社区'))))
+        rr.append((tag + ' JSON 安全替代表三字段', all({'环节材料', '风险', '安全替代'} <= set(x) for x in data['safety_alternatives'])))
+        rr.append((tag + ' JSON 隐私声明 red_zone_free', data['privacy'].get('red_zone_free') is True))
+        # 2.4.0：感官调节与 IEP 追踪
+        # 3.13.0 重写：原写法是 set(sdims) == {五维} 的**硬相等**——一旦源稿多了一个维度
+        # （如用到嗅觉的课），缺的那条先被 SENSORY_MAP 丢弃、再被这条相等"验证通过"，
+        # 缺陷被自己的校验保护起来（反向变异已证：删掉嗅觉条目照样全绿）。
+        # 改为"必载⊆实际"＋"条数≡源稿行数"，两条交叉才锁得住。
+        sdims = [x['维度'] for x in data.get('sensory_regulation', [])]
+        base_full = {'听觉', '视觉', '前庭与座位', '口欲与过敏', '触觉与材料'}
+        miss_sd = sorted(base_full - set(sdims))
+        rr.append((tag + ' JSON 感官必载五维齐全', not miss_sd, '' if not miss_sd else '缺' + ','.join(miss_sd)))
+        rr.append((tag + ' JSON 感官维度全部在枚举内(含嗅觉)',
+                  set(sdims) <= (base_full | set(SENSORY_EXTRA)),
+                  '' if set(sdims) <= (base_full | set(SENSORY_EXTRA)) else '越界:' + ','.join(sorted(set(sdims) - base_full - set(SENSORY_EXTRA)))))
+        # 行数守恒：md→JSON 禁丢行（这是本次缺陷的正主）
+        src_rows = md_sensory_rows(md_path)
+        rr.append((tag + ' JSON 感官条数≡源稿感官表行数(禁派生丢行)',
+                  len(sdims) == len(src_rows),
+                  '' if len(sdims) == len(src_rows) else 'JSON%d/md%d' % (len(sdims), len(src_rows))))
+        rr.append((tag + ' JSON 感官维度名与源稿一一对应',
+                  bool(src_rows) and sorted(sdims) == sorted(src_rows),
+                  '' if sorted(sdims) == sorted(src_rows) else 'JSON:%s md:%s' % (sorted(sdims), sorted(src_rows))))
+        rr.append((tag + ' JSON 感官每条四字段非空',
+                  all(all(x.get(k) for k in ('触发信号', '前置安排', '降刺激通道'))
+                      for x in data.get('sensory_regulation', []))))
+        ie_rows = data.get('iep_tracking', [])
+        rr.append((tag + ' JSON IEP 追踪全生覆盖(12人)', len(ie_rows) == 12, '实%d人' % len(ie_rows)))
+        rr.append((tag + ' JSON IEP 追踪逐课时达成列==N',
+                  all(len(row.get('分课时达成', {})) == n for row in ie_rows)))
+        rr.append((tag + ' JSON IEP 追踪字段非空且代号合规',
+                  bool(ie_rows) and all(row.get('年度长期目标') and row.get('本课短期目标')
+                                        and re.match(r'^生\d+$', row['学生代号']) and row.get('累计口径')
+                                        for row in ie_rows)))
+        return rr
+
+    # SKILL.md §6 声明的顶层字段集合必须与 Schema required 一致（防文档与契约漂移）。
+    # 与具体样例无关，故放在循环外只跑一次——放进循环会按样例数重复计数，稀释通过率的含金量。
     try:
         sm = open(os.path.join(root, 'SKILL.md'), encoding='utf-8').read()
         decl = re.search(r'顶层必填\s*`([^`]+)`', sm)
         names = set(re.findall(r'[A-Za-z_][A-Za-z0-9_]*', decl.group(1))) if decl else set()
+        # detail 统一：通过时留空；失败时分别列出"多出的"与"缺少的"。
+        # 旧写法通过时也吐 "多 缺"（两个空 join 拼成的空壳），读者完全无法判读。
+        extra_s, lack_s = sorted(names - set(top)), sorted(set(top) - names)
         r.append(('SKILL.md §6 顶层字段声明 ≡ Schema required',
                   bool(names) and names == set(top),
-                  '多%s 缺%s' % (','.join(sorted(names - set(top))),
-                                 ','.join(sorted(set(top) - names)))))
+                  '' if not extra_s and not lack_s
+                  else '多:%s 少:%s' % (','.join(extra_s), ','.join(lack_s))))
     except Exception as e:
         r.append(('SKILL.md §6 顶层字段声明 ≡ Schema required', False, str(e)[:60]))
-    ancs = data.get('anchors', [])
-    r.append(('JSON 多锚点且每条三级齐全',
-              len(ancs) >= 1 and all(all(a.get(k) for k in ('板块', '条目', '表述')) for a in ancs),
-              '%d条' % len(ancs)))
 
-    n = data['meta']['课时数N']
-    dur = data['meta']['单课时时长分钟']
-    lessons = data['lessons']
-    r.append(('JSON lessons 数 == 课时数N', len(lessons) == n, '%d/%d' % (len(lessons), n)))
-
-    # ===== 3.1.0 新增：课时量研判（课时数由引擎研判，非默认 1 课时、非用户输入）=====
-    jg = data.get('meta', {}).get('课时研判', {})
-    jk = ['研判身份', '基础时长分钟', '复现系数', '分层系数', '有效利用时长分钟',
-          '测算课时数', '学科校验锚', '研判课时数N', '确定方式', '研判依据']
-    miss_j = [k for k in jk if not jg.get(k)]
-    r.append(('JSON meta.课时研判 十项齐全', not miss_j, '缺' + ','.join(miss_j) if miss_j else ''))
-    r.append(('研判身份为双身份(学科专家＋特级教师)',
-              '资深教学专家' in jg.get('研判身份', '') and '特级教师' in jg.get('研判身份', '')))
-    r.append(('JSON 研判课时数N == 课时数N', jg.get('研判课时数N') == n,
-              '%s/%s' % (jg.get('研判课时数N'), n)))
-    r.append(('确定方式属合法枚举(直定/确认)',
-              jg.get('确定方式') in ('轻打扰直定', '输出确认'), str(jg.get('确定方式'))))
-    b, rc, lc, ef, calc = (jg.get('基础时长分钟'), jg.get('复现系数'), jg.get('分层系数'),
-                           jg.get('有效利用时长分钟'), jg.get('测算课时数'))
-    num_ok = all(isinstance(x, (int, float)) and x for x in (b, rc, lc, ef, calc))
-    if num_ok:
-        want = b * rc * lc / ef
-        r.append(('测算式可复核(基础×复现×分层÷有效≈测算值)', abs(want - calc) < 0.02,
-                  '%.2f vs %s' % (want, calc)))
-        r.append(('研判N == ceil(测算值)', n == int(calc) + (1 if calc % 1 else 0),
-                  'N=%d 测算=%s' % (n, calc)))
-        r.append(('复现/分层系数在规定区间', 1.2 <= rc <= 1.5 and 1.1 <= lc <= 1.3,
-                  '复现%s 分层%s' % (rc, lc)))
-        r.append(('有效利用时长 == 单课时时长×0.75(±1)', abs(ef - dur * 0.75) <= 1,
-                  '%s vs %s' % (ef, dur * 0.75)))
-        margin = (n - calc) / n
-        r.append(('双出口判定自洽(余量>10%且N≤3 ⇔ 轻打扰直定)',
-                  (margin > 0.10 and n <= 3) == (jg.get('确定方式') == '轻打扰直定'),
-                  '余量%.0f%% N=%d %s' % (margin * 100, n, jg.get('确定方式'))))
-    else:
-        r.append(('测算式可复核(基础×复现×分层÷有效≈测算值)', False, '研判字段非数值'))
-
-    needed = {'B', 'O', 'P前', 'P参', 'P后', 'S'}
-    steps_ok, time_ok, matrix_ok, inq_ok = True, True, True, True
-    detail = []
-    for ls in lessons:
-        steps = set(x['step'] for x in ls['timeline'])
-        s = sum(x['分钟'] for x in ls['timeline'])
-        if not needed <= steps:
-            steps_ok = False
-        if s != dur:
-            time_ok = False
-        if len(ls['objectives_matrix']) < 9:
-            matrix_ok = False
-        if len(ls['inquiry_activities']) < 1:
-            inq_ok = False
-        detail.append('L%d=%d' % (ls['课时序号'], s))
-    r.append(('JSON 每课时 BOPPPS 六步齐全', steps_ok))
-    r.append(('JSON 每课时分钟合计==%d' % dur, time_ok, ' '.join(detail)))
-    r.append(('JSON 每课时目标矩阵≥9格', matrix_ok))
-    r.append(('JSON 每课时探究活动≥1', inq_ok))
-
-    los_ok, code_ok = True, True
-    for row in data['los_table']:
-        recs = row['records']
-        if len(recs) != n:
-            los_ok = False
-        if any(('起始LOS' not in x or '达成LOS' not in x) for x in recs):
-            los_ok = False
-        if not re.match(r'^生\d+$', row['学生代号']):
-            code_ok = False
-    r.append(('JSON LOS 逐生逐课时成对', los_ok, '%d人' % len(data['los_table'])))
-    r.append(('JSON 学生一律代号(红区合规)', code_ok))
-
-    sup = data['support']
-    keys = {'触发信号', '前因调整', '替代行为', '强化计划', '危机处置', '全员一致要求'}
-    r.append(('JSON 行为支持卡六要素', keys <= set(sup['behavior_card'])))
-    r.append(('JSON 含晋级降级阈值规则', len(sup.get('progression_rules', {})) >= 5))
-    r.append(('JSON 泛化三场景齐全', all(data['generalization'].get(k) for k in ('家庭', '学校', '社区'))))
-    r.append(('JSON 安全替代表三字段', all({'环节材料', '风险', '安全替代'} <= set(x) for x in data['safety_alternatives'])))
-    r.append(('JSON 隐私声明 red_zone_free', data['privacy'].get('red_zone_free') is True))
-    # 2.4.0：感官调节与 IEP 追踪
-    sdims = [x['维度'] for x in data.get('sensory_regulation', [])]
-    r.append(('JSON 感官五维度齐全',
-              set(sdims) == {'听觉', '视觉', '前庭与座位', '口欲与过敏', '触觉与材料'}, '/'.join(sdims)))
-    r.append(('JSON 感官每条四字段非空',
-              all(all(x.get(k) for k in ('触发信号', '前置安排', '降刺激通道'))
-                  for x in data.get('sensory_regulation', []))))
-    ie_rows = data.get('iep_tracking', [])
-    r.append(('JSON IEP 追踪全生覆盖(12人)', len(ie_rows) == 12, '实%d人' % len(ie_rows)))
-    r.append(('JSON IEP 追踪逐课时达成列==N',
-              all(len(row.get('分课时达成', {})) == n for row in ie_rows)))
-    r.append(('JSON IEP 追踪字段非空且代号合规',
-              bool(ie_rows) and all(row.get('年度长期目标') and row.get('本课短期目标')
-                                    and re.match(r'^生\d+$', row['学生代号']) and row.get('累计口径')
-                                    for row in ie_rows)))
+    for jpath in jf:
+        short = os.path.basename(jpath).replace('_结构化输出样例.json', '')
+        tag = '[%s]' % short
+        mdp = md_of(jpath)
+        r.append((tag + ' 存在对应源稿 md（可交叉核验）', bool(mdp),
+                  '' if mdp else 'JSON 无同名源稿，无法做 md↔JSON 交叉断言'))
+        try:
+            data = json.load(open(jpath, encoding='utf-8'))
+            r.append((tag + ' JSON 样例为合法 JSON', True))
+        except Exception as e:
+            r.append((tag + ' JSON 样例为合法 JSON', False, str(e)[:80]))
+            continue
+        r.extend(one(data, tag, mdp))
     return r
 
 
@@ -1420,14 +1604,46 @@ def check_repo(root, ev):
     return r
 
 
+def _emit_note_metacheck(all_items, out, total, ok):
+    """元断言：PASS 项的备注里禁出现失败态字样。
+
+    3.13.0 立。此前有 8 处断言无条件写 `'缺' + ','.join(空列表)`（甚至硬编码 `'缺嗅觉'`），
+    报告里满屏 "PASS … 缺"，读者与 FAIL 无从分辨。这是同类缺陷的第二次复发
+    （3.9.0 首次立规），靠人工 review 拦不住，所以让脚本盯着自己的文案：
+    **备注是给失败时说明原因用的，通过时必须保持中性或留空。**"""
+    NEG = ('缺', '未可能', '残留', '失败', '有误', '越界', '逾越')
+    bad = []
+    for it in all_items:
+        if len(it) < 3 or not it[1]:
+            continue
+        note = str(it[2])
+        if not note:
+            continue
+        for w in NEG:
+            if w in note:
+                bad.append((w, it[0], note))
+                break
+    if bad:
+        for w, lbl, note in bad[:6]:
+            total += 1
+            out.append('  [FAIL] PASS 却显示失败文案(%s) %s | %s' % (w, lbl, note[:60]))
+    else:
+        total += 1
+        ok += 1
+        out.append('  [PASS] PASS 项备注无失败态字样(元断言)')
+    return total, ok
+
+
 def main():
     out = []
+    all_items = []
     EV = read_engine_version(ROOT)
     out.append('引擎版本：%s' % EV)
     files = sorted(glob.glob(os.path.join(ROOT, 'examples', '*.md')))
     total = ok = 0
     for f in files:
         name, rs = check(f)
+        all_items.extend(rs)
         out.append('=== %s ===' % name)
         for item in rs:
             label, passed = item[0], item[1]
@@ -1438,36 +1654,42 @@ def main():
     out.append('')
     out.append('=== 结构化输出契约 references/output-schema.json ===')
     for item in check_schema(ROOT, EV):
+        all_items.append(item)
         total += 1
         ok += 1 if item[1] else 0
         out.append('  [%s] %s %s' % ('PASS' if item[1] else 'FAIL', item[0], item[2] if len(item) > 2 else ''))
     out.append('')
     out.append('=== 引擎自身 SKILL.md ===')
     for item in check_skill_md(ROOT):
+        all_items.append(item)
         total += 1
         ok += 1 if item[1] else 0
         out.append('  [%s] %s %s' % ('PASS' if item[1] else 'FAIL', item[0], item[2] if len(item) > 2 else ''))
     out.append('')
     out.append('=== md→JSON 派生一致性（Single Source） ===')
     for item in check_derived(ROOT, EV):
+        all_items.append(item)
         total += 1
         ok += 1 if item[1] else 0
         out.append('  [%s] %s %s' % ('PASS' if item[1] else 'FAIL', item[0], item[2] if len(item) > 2 else ''))
     out.append('')
     out.append('=== Word 成品 md→docx（结构/版式/幂等/防漂移） ===')
     for item in check_docx(ROOT):
+        all_items.append(item)
         total += 1
         ok += 1 if item[1] else 0
         out.append('  [%s] %s %s' % ('PASS' if item[1] else 'FAIL', item[0], item[2] if len(item) > 2 else ''))
     out.append('')
     out.append('=== 交付通道契约 md→docx CLI / 反篡改 / PDF 已移除 ===')
     for item in check_delivery(ROOT):
+        all_items.append(item)
         total += 1
         ok += 1 if item[1] else 0
         out.append('  [%s] %s %s' % ('PASS' if item[1] else 'FAIL', item[0], item[2] if len(item) > 2 else ''))
     out.append('')
     out.append('=== 双轨合规与仓库卫生 ===')
     for item in check_repo(ROOT, EV):
+        all_items.append(item)
         total += 1
         ok += 1 if item[1] else 0
         out.append('  [%s] %s %s' % ('PASS' if item[1] else 'FAIL', item[0], item[2] if len(item) > 2 else ''))
@@ -1480,13 +1702,18 @@ def main():
             seen.clear()
             continue
         if l.startswith('  [PASS') or l.startswith('  [FAIL'):
-            key = l.split(']', 1)[1].strip()
+            # 3.13.0：check_schema 的断言名现带 `[样例名]` 前缀，若仍用 split(']',1)
+            # 会把前缀连同 tag 一起切掉，两份样例的同名断言会被误报为"重复计入"。
+            # 去重键必须保留完整标签（含样例 tag），真正同 tag 同内容的重复才会计入。
+            key = l[8:].strip()
             if key in seen:
                 dup.append(l.strip())
             seen.add(key)
     for d in dup[:5]:
         total += 1
         out.append('  [FAIL] 断言重复计入 %s' % d)
+    out.append('')
+    total, ok = _emit_note_metacheck(all_items, out, total, ok)
     out.append('')
     rate = ok * 100.0 / total if total else 0
     out.append('通过率：%d/%d = %.1f%%' % (ok, total, rate))
