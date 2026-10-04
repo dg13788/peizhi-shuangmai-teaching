@@ -686,6 +686,26 @@ def check_skill_md(root):
     acc = ['7:1', '4.5:1', '24pt', '36pt', '不得仅依赖颜色']
     miss_a = [k for k in acc if k not in corpus]
     r.append(('无障碍基线保留(全库)', not miss_a, '缺' + ','.join(miss_a) if miss_a else ''))
+    # 3.9.0：低视力放大口径不得低于图卡标签基线（在效条文口径只能有一套）。
+    # 范围＝SKILL.md ∪ references/ ∪ examples/；**不含 CHANGELOG**（其历史条目记录的是
+    # 当时口径，按"历史版本标注不得回改"铁律保留原文，不可因断言而篡改历史）。
+    lv_hits = []
+    for _src, _txt in [('SKILL.md', text)] + [
+            (os.path.basename(x), open(x, encoding='utf-8').read())
+            for x in sorted(glob.glob(os.path.join(root, 'references', '*.md')))
+    ] + [(os.path.basename(x), open(x, encoding='utf-8').read())
+         for x in sorted(glob.glob(os.path.join(root, 'examples', '*.md')))]:
+        for m in re.finditer(r'低视力生[^。；\n]{0,14}?18pt', _txt):
+            if '学习单' not in m.group():
+                lv_hits.append('%s:%s' % (_src, m.group()))
+    r.append(('在效条文无"低视力降至18pt"旧口径(全扫描)', not lv_hits,
+              ';'.join(lv_hits[:2])))
+    # 3.9.0：教材/学情分析在主文件六环节表中只能挂载一次（曾同时挂在环节0与环节1）
+    wf = re.search(r'## 2\. 六环节工作流.*?(?=\n## |\Z)', text, re.M | re.S)
+    wf_txt = wf.group(0) if wf else ''
+    r.append(('环节表中教材/学情分析只挂载一次(防重复挂载)',
+              wf_txt.count('教材/学情分析') + wf_txt.count('教材分析·学情分析') == 1,
+              '出现%d次' % (wf_txt.count('教材/学情分析') + wf_txt.count('教材分析·学情分析'))))
     # 2.6.0 渐进式披露元断言：①主文件体积封顶（防细则回流膨胀）②细则层无孤儿文件
     #   ③主文件常驻关键枚举（LOS/BOPPPS/分层/判据三段式）
     size = len(text.encode('utf-8'))
