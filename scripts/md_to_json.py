@@ -584,6 +584,7 @@ def derive(text):
             'reinforcement_schedule': reinf,
             'progression_rules': prog,
             '人力协同': staffing,
+            '家长记录条': home_note,
         },
         'generalization': gen,
         'safety_alternatives': safety,

@@ -185,6 +185,184 @@ def check(path):
     if '家长记录条' in text:
         r.append(('发家长记录条→材料清单须列', '家长记录条' in seg))
 
+    # ---- 3.10.0 家长记录条（勾勾表制式）：此前引擎只列物料、未定义版式 ----
+    hn_m = re.search(r'^### 家长记录条.*?\n(.*?)(?=^### |^## |\Z)', text, re.M | re.S)
+    r.append(('家长记录条小节存在(3.10.0勾勾表制式)', bool(hn_m)))
+    if hn_m:
+        body_hn = hn_m.group(1)
+        # 档位必须取自 ☐ 行本身——用全文子串会被条首/对齐说明里的同名词兜住，
+        # 导致"档位被删"仍能通过（3.9.0 宽松子串教训的同类复发，此处以结构位置锚定）
+        opts_hn = []
+        for l in body_hn.splitlines():
+            s2 = l.strip()
+            if not s2.startswith('\u2610'):
+                continue
+            for seg in s2.split('\u2610'):
+                seg = seg.strip().strip('\u3000').strip()
+                if seg:
+                    opts_hn.append(seg)
+        r.append(('记录条勾选档位≥5(四档＋未发生)', len(opts_hn) >= 5, '实%d档' % len(opts_hn)))
+        # 四档行为锚定须与课堂 LOS 层级代号 I/V/G/P 对齐，否则家校数据无法合并、回收即废
+        miss_hn = [k for k in ('自己做的', '提醒一句', '指一下或做手势', '手把手')
+                   if not any(k in o for o in opts_hn)]
+        # detail 只在失败时给原因：3.13.0 修正——此前无条件写 '缺'+join(空) = '缺'，
+        # 报告里一排 "PASS … 缺"，读的人会当成"缺了东西"，与 FAIL 无从分辨。
+        r.append(('记录条四档行为锚定齐全(对齐I/V/G/P)', not miss_hn,
+                  '' if not miss_hn else '缺' + ','.join(miss_hn)))
+        # 未发生 ≠ 未填：空白格一律按缺失处理，不得计入达成
+        r.append(('记录条末档含"今天没做"(未发生≠未填)',
+                  any('今天没做' in o for o in opts_hn)))
+        # 纯勾选捕捉不到生态事件 → 必须保留选填开放式
+        r.append(('记录条保留1行选填开放式', '选填' in body_hn))
+        # 表号恒等于出现顺序：记录条做成表格会使教学过程内"表N"内嵌引用整体错位
+        r.append(('记录条不占表号(禁做成带编号表格)',
+                  re.search(r'\*\*表\d+', body_hn) is None))
+        # 无回填落点的记录条＝让家长白填，是回收率逐轮衰减的真因。
+        # 须有独立条目且指向具体位置（只查"回填"二字会被同句其它表述掩盖）
+        m_rb = re.search(r'^- \*\*回填落点\*\*：(.*)$', body_hn, re.M)
+        r.append(('记录条指定回填落点(须有独立条目)', m_rb is not None))
+        r.append(('记录条回填落点指向具体位置',
+                  bool(m_rb) and re.search(r'生活泛化|IEP', m_rb.group(1)) is not None))
+        # 一张条印满三层会让家长找不到本层题目 → 弃填
+        r.append(('记录条按A/B/C三层分版',
+                  re.search(r'三层[^。；\n]{0,14}?各\s*印?\s*一版', body_hn) is not None))
+    # 材料清单须同步注明分版，否则教师只印一版、家长找不到本层题
+    r.append(('材料清单注明记录条按层分版',
+              re.search(r'家长记录条[^。\n]{0,24}?三层各一版', text) is not None))
+    # 否定式：行为 ABC 简录禁止勾选化（前事—行为—后果一勾选即丧失功能评估价值）
+    abc_rows = [l for l in text.splitlines() if 'ABC' in l]
+    r.append(('ABC简录未被勾选化(禁☐罗列)',
+              not any('\u2610' in l for l in abc_rows)))
+
+    # 3.8.0 教学设计结构要素补齐：教材分析 / 学情分析 / 教学重难点 / 人力协同
+    tb = re.search(r'^### 教材分析\s*\n(.*?)(?=^### |^## |\Z)', text, re.M | re.S)
+    r.append(('教材分析小节存在', bool(tb)))
+    if tb:
+        body_tb = tb.group(1)
+        miss_tb = [k for k in ('出处与定位', '地位与作用', '内容解读', '前后联系', '使用建议')
+                   if k not in body_tb]
+        r.append(('教材分析五要素齐全', not miss_tb,
+                  '' if not miss_tb else '缺' + ','.join(miss_tb)))
+        # 前后联系是"教材分析"最容易写漏的一条：只写本课、不写已学与铺垫＝没有分析
+        r.append(('教材分析含前后联系(已学→本课→铺垫)',
+                  '已学' in body_tb and ('铺垫' in body_tb or '后续' in body_tb)))
+    la = re.search(r'^### 学情分析\s*\n(.*?)(?=^### |^## |\Z)', text, re.M | re.S)
+    r.append(('学情分析小节存在', bool(la)))
+    if la:
+        body_la = la.group(1)
+        miss_la = [k for k in ('已有基础与生活经验', '障碍与能力特点', '学习优势与困难',
+                               '起点能力', '分层教学结论')
+                   if k not in body_la]
+        r.append(('学情分析五要素齐全', not miss_la,
+                  '' if not miss_la else '缺' + ','.join(miss_la)))
+        # 禁堆叠诊断标签（功能性描述才有教学决策价值）
+        r.append(('学情分析为功能性描述(禁诊断标签堆叠)',
+                  not re.search(r'(中度|重度|轻度)智力障碍[＋+].*(自闭|脑瘫|语言)', body_la)))
+    # 每课时三条：教学重点 / 教学难点 / 突破策略（禁只在矩阵后写一行"重难点：……"）
+    miss_kp = []
+    for _i in range(1, n_less + 1):
+        segk = re.search(r'^### 第%d课时.*?(?=^### |^## |\Z)' % _i, text, re.M | re.S)
+        if not segk:
+            miss_kp.append('%d缺节' % _i)
+            continue
+        for kk in ('教学重点', '教学难点', '突破策略'):
+            if kk not in segk.group(0):
+                miss_kp.append('%d%s' % (_i, kk))
+    r.append(('每课时含重难点三要素(重点/难点/突破策略)', not miss_kp,
+              ','.join(miss_kp)))
+    # 教学资源要素：材料说清"物"，还须说清"人"
+    hc = re.search(r'^### 人力协同.*?(?=^### |^## |\Z)', text, re.M | re.S)
+    r.append(('人力协同小节存在', bool(hc)))
+    if hc:
+        miss_hc = [k for k in ('主教', '助教', '家长或陪读', '一致性要求') if k not in hc.group(0)]
+        r.append(('人力协同四要素齐全(主教/助教/家长/一致)', not miss_hc,
+                  '' if not miss_hc else '缺' + ','.join(miss_hc)))
+
+        # 禁做成带编号表格：表号恒等于出现顺序，此处插表会使教学过程内"表N"引用整体错位
+        r.append(('人力协同未占用编号表(防表号级联错位)',
+                  not re.search(r'\*\*表\d+[^\n]*人力协同', hc.group(0))))
+
+    # ---- 3.11.0 材料清单可获性三级标注（资源不足学校的刚需）----
+    ms = re.search(r'^### 材料清单.*?\n(.*?)(?=^### |^## |\Z)', text, re.M | re.S)
+    if ms:
+        mat_l = [l for l in ms.group(1).splitlines() if l.strip().startswith('☐')]
+        no_tag = [l for l in mat_l if not re.search(r'【(采购|自制|替代)', l)]
+        r.append(('材料清单每条含可获性三级标注', len(mat_l) >= 1 and not no_tag,
+                  '%d条未标' % len(no_tag) if no_tag else '%d条' % len(mat_l)))
+        # 只写“替代”而不给替代物＝等于没标，教师临到课前仍无方案
+        bad_alt = [l for l in mat_l if '替代' in l and not re.search(r'替代\s*[：:]', l)]
+        r.append(('【替代】须写出具体替代物', not bad_alt, str(len(bad_alt)) + '条空标'))
+        # 只按行检测会漏：一行常含多个条目，删掉其中一个的标注仍有同行别处兜住。
+        # 故再加总量门槛，取"材料行数"——标注数低于行数即平均每行不到一处＝敷衍
+        n_tag = len(re.findall(r'【(?:采购|自制|替代)', ms.group(1)))
+        r.append(('材料三级标注覆盖充分(≥材料行数)', n_tag >= len(mat_l),
+                  '%d处/%d行' % (n_tag, len(mat_l))))
+        # ---- 3.12.0 一条一项（源稿层）：此前一行用分号串联 3~6 个材料，
+        #      Word 里落成整段且相邻两项之间连分隔符都没有 → 课前逐项勾核形同虚设。
+        #      结构判据：一条只许一个 ☐，且**只许一处【…】标注**
+        #      （两处＝两个材料被并成一条；流于全文子串仍会被同行别处兜住，故按结构计数）
+        multi = [l for l in mat_l
+                 if l.count('\u2610') > 1 or len(re.findall(r'【', l)) > 1]
+        r.append(('材料清单一条一项(禁一行串联多项)', not multi,
+                  '%d条多项' % len(multi)))
+        # 数量与负责人：缺数量则备料不足，缺负责人则临堂无人去拿
+        no_qty = [l for l in mat_l if not re.search(r'(\d+\s*(个|张|套|份|包|台|版|支|块|人|按组计))', l)]
+        r.append(('材料清单每条标数量', not no_qty,
+                  '' if not no_qty else '%d条未标数量' % len(no_qty)))
+        no_own = [l for l in mat_l
+                  if not re.search(r'(主教|助教|教师|家长)', l)]
+        r.append(('材料清单每条标负责人', not no_own,
+                  '' if not no_own else '%d条未标负责人' % len(no_own)))
+    # ---- 3.11.0 突破策略须显式挂 LOS 档位代号 ----
+    bps = re.findall(r'^\*\*突破策略\*\*：(.*)$', text, re.M)
+    r.append(('突破策略条数==课时数', len(bps) == n_less, '%d条/课时%d' % (len(bps), n_less)))
+    # 按"有没有"检测会漏：一条内改掉一处档位标注，别处仍在。
+    # 故要求每条覆盖≥3个档位组——只标一档等于没分档
+    def _bp_grp(x):
+        return len(re.findall(r'\*\*[IVGPFN]+', x))
+    r.append(('突破策略挂LOS档位代号', len(bps) >= 1 and all(_bp_grp(x) >= 1 for x in bps)))
+    r.append(('突破策略覆盖≥3个档位组', len(bps) >= 1 and all(_bp_grp(x) >= 3 for x in bps),
+              '最少%d组' % min([_bp_grp(x) for x in bps]) if bps else ''))
+    # I 档“已达成就无需策略”是错的：先会的学生无安排即课堂空转，是走神与扰动源
+    r.append(('突破策略禁写"I档无需策略"',
+              not any(re.search(r'(无需|不需要).{0,4}策略', x) for x in bps)))
+    # ---- 3.11.0 情感态度判据（参与强度分级，禁不可执行的秒数判据）----
+    emo = re.findall(r'^\| 情感态度价值观 \|(.*)$', text, re.M)
+    c_col = [l.strip().strip('|').split('|')[-1].strip() for l in emo]
+    r.append(('情感态度C列用参与强度分级', len(c_col) >= 1 and all('级' in c for c in c_col)))
+    r.append(('情感态度C列禁旧口径"≥1次即合法证据"',
+              not any('≥1次即合法证据' in c for c in c_col)))
+    # 12人课堂教师无法同时为多人掐表：写了也记不了，是伪可测判据
+    r.append(('禁"注视≥N秒"类不可执行判据',
+              re.search(r'注视\s*[≥>]\s*\d+\s*秒', text) is None))
+
+    # ===== 3.9.0 新增：字符级回测发现的内部自相矛盾 / 体例漂移 =====
+    # 1) 交付稿是面向教师的中文正式文档，半角直引号与中文弯引号混用会视觉打架；
+    #    且极易在编辑期被无意引入（3.8.0 一次引入 117 处，另一份基准为 0 处可对照）。
+    straight_q = len(re.findall(r'(?<![A-Za-z0-9=,\n])"(?![=,\n])', text))
+    r.append(('交付稿无中英引号混用(禁非标点半角引号)', straight_q == 0,
+              '残留%d处' % straight_q if straight_q else ''))
+    # 2) 低视力放大值曾低于图卡标签基线（要求≥24pt，却写"放大至18pt"）——给低视力生的字更小
+    # 注：用正则而非固定子串——第一轮曾用 `'低视力生材料放大至18pt'` 固定串，
+    # 结果漏掉 `format-baseline.md` 的"放大至 18pt"（带空格）与
+    # `release-checklist.md` 的"低视力生18pt"（无"放大至"三字）两处同型缺陷。
+    low_pat = re.compile(r'低视力生[^。；\n]{0,14}?18pt')
+    hit_lv = [m.group() for m in low_pat.finditer(text)
+              if '学习单正文≥18pt' not in m.group() and '学习单正文 ≥18pt' not in m.group()]
+    # 学习单正文 ≥18pt 是合法（学习单≠图卡标签）；图卡标签类下降至 18pt 才是缺陷
+    bad_lv = [h for h in hit_lv if '学习单' not in h and '打印学习单' not in h]
+    r.append(('低视力放大值不低于图卡标签基线(防自相矛盾)', not bad_lv, ','.join(bad_lv[:2])))
+    r.append(('低视力生仍有明确再放大口径', bool(re.search(r'低视力生.*再放大', text))))
+    # 3) 节名禁中英混排
+    r.append(('交付稿无裸英文节名(checklist)', 'checklist' not in text))
+    # 4) P参 子步骤编号须属本课时（4.1/4.2 是跨课时通用编号，三课时同名=无法核对）
+    dup_sub = re.findall(r'新授 4\.\d', text)
+    r.append(('P参子步骤未用跨课时通用编号', not dup_sub, ','.join(dup_sub[:3])))
+    # 5) 起始 LOS 由 P前 前测确定；B 导入环节在前测之前，其证据不得占用「起始列」
+    bad_ev = re.findall(r'证据：[^|]*?→表\d+起始列', text)
+    r.append(('B导入证据未占用起始列(起始LOS以P前为准)', not bad_ev,
+              '残留%d处' % len(bad_ev) if bad_ev else ''))
+
     # 8 安全替代表三列含风险
     safe = [b for b in bs if b and '安全替代' in b[0]]
     r.append(('安全替代表三列(含风险列)', bool(safe) and len(cells(safe[0][0])) == 3 and '风险' in safe[0][0]))
@@ -614,6 +792,13 @@ def check_derived(root, ev=''):
         r.append((tag + ' 派生泛化三场景', all(data['generalization'].get(k) for k in ('家庭', '学校', '社区'))))
         r.append((tag + ' 派生安全替代表非空', len(data['safety_alternatives']) >= 1))
         r.append((tag + ' 派生材料清单非空', len(data['materials']) >= 1))
+        hn_d = data.get('support', {}).get('家长记录条', {})
+        r.append((tag + ' 派生记录条勾选档位≥5', len(hn_d.get('勾选档位', [])) >= 5,
+                  '实%d档' % len(hn_d.get('勾选档位', []))))
+        r.append((tag + ' 派生记录条回填落点非空', bool(hn_d.get('回填落点', ''))))
+        # ☐ 同时是材料清单的解析锚点：记录条若被误并入 materials 即为解析串味
+        r.append((tag + ' 派生材料清单未被记录条污染',
+                  not any('自己做的' in m for m in data.get('materials', []))))
         p = os.path.join(root, 'examples', '%s_结构化输出样例.json' % data['meta']['课题'])
         if os.path.exists(p):
             saved = json.load(open(p, encoding='utf-8'))
