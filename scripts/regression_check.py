@@ -580,6 +580,25 @@ def check_derived(root, ev=''):
             if s != dur:
                 bad.append('L%d=%d' % (ls['课时序号'], s))
         r.append((tag + ' 派生每课时时间合计==%d' % dur, not bad, ' '.join(bad)))
+        # 3.8.0 教学设计结构要素派生：教材分析 / 学情分析 / 重难点 / 人力协同
+        tbj = data['meta'].get('教材分析', {})
+        laj = data['meta'].get('学情分析', {})
+        r.append((tag + ' 派生教材分析五要素',
+                  all(tbj.get(k) for k in ('出处与定位', '地位与作用', '内容解读',
+                                           '前后联系', '使用建议')),
+                  str(sorted(tbj.keys()))))
+        r.append((tag + ' 派生学情分析五要素',
+                  all(laj.get(k) for k in ('已有基础与生活经验', '障碍与能力特点',
+                                           '学习优势与困难', '起点能力', '分层教学结论')),
+                  str(sorted(laj.keys()))))
+        kp_bad = [ls['课时序号'] for ls in data['lessons']
+                  if not all(ls.get('重难点', {}).get(k)
+                             for k in ('教学重点', '教学难点', '突破策略'))]
+        r.append((tag + ' 派生每课时重难点三要素', not kp_bad, str(kp_bad)))
+        hcj = data['support'].get('人力协同', {})
+        r.append((tag + ' 派生人力协同四要素',
+                  all(hcj.get(k) for k in ('主教', '助教', '家长或陪读', '一致性要求')),
+                  str(sorted(hcj.keys()))))
         r.append((tag + ' 派生 LOS 逐课时成对',
                   len(data['los_table']) >= 1 and all(len(row['records']) == n for row in data['los_table']),
                   '%d人' % len(data['los_table'])))

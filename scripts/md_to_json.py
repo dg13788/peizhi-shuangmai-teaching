@@ -90,8 +90,17 @@ def find_sec(secs, *subs, level=None):
     return None
 
 
-def find_secs_startswith(secs, prefix, level=None):
-    return [(lv, t, b) for lv, t, b in secs if t.startswith(prefix) and (level is None or lv == level)]
+def parse_bold_kv(body):
+    """解析 '**键**：值' / '- **键**：值' 形式的行 -> dict（3.8.0 教材分析/学情分析/重难点共用）"""
+    d = {}
+    for l in body:
+        m = re.match(r'^\s*(?:[-*]|\d+[.、)])?\s*\*\*(.+?)\*\*\s*[：:]\s*(.+)$', l.strip())
+        if m:
+            # 键名归一化：剥离行尾括号补充说明，使"使用建议（培智化取舍）"→"使用建议"，
+            # 与 output-schema.json 的属性名严格对齐（否则派生键与契约键对不上）
+            key = re.sub(r'[（(][^）)]*[）)]\s*$', '', m.group(1)).strip()
+            d[key] = m.group(2).strip()
+    return d
 
 
 # ---------- 字段解析 ----------
@@ -452,6 +461,70 @@ def derive(text):
                     '累计口径': iep_note,
                 })
 
+    # ---- 教材分析 / 学情分析（3.8.0；须 level=3 命中子小节，避开父章节标题）----
+    textbook, learner = {}, {}
+    tb_sec = find_sec(secs, '教材分析', level=3)
+    if tb_sec:
+        textbook = parse_bold_kv(tb_sec[2])
+    la_sec = find_sec(secs, '学情分析', level=3)
+    if la_sec:
+        learner = parse_bold_kv(la_sec[2])
+
+    # ---- 教学重难点（3.8.0；每课时三条，落在各课时目标矩阵小节内）----
+    keypoints = {}
+    for _, t, body in secs:
+        idx = lesson_idx(t)
+        if not idx:
+            continue
+        kv = parse_bold_kv(body)
+        kp = dict([(k, v) for k, v in kv.items()
+                   if k in ('教学重点', '教学难点', '突破策略')])
+        if kp:
+            keypoints[idx] = kp
+
+    # ---- 人力协同与分工（3.8.0 教学资源要素：主教/助教/家长或陪读）----
+    staffing = {}
+    hc_sec = find_sec(secs, '人力协同', level=3)
+    if hc_sec:
+        for header, rows in table_blocks(hc_sec[2]):
+            if not header or '角色' not in header[0]:
+                continue
+            for r in rows:
+                if len(r) >= 2 and r[0]:
+                    staffing[r[0].strip()] = r[1].strip()
+        # 分工以项目符号表述（避免新增表格导致表号级联重排，见 3.8.0）
+        staffing.update(parse_bold_kv(hc_sec[2]))
+
+    # ---- 家长记录条（3.10.0 勾勾表制式：家长填写，四档行为锚定对齐 LOS）----
+    home_note = {}
+    hn_sec = find_sec(secs, '家长记录条', level=3)
+    if hn_sec:
+        body = hn_sec[2]
+        opts = []
+        for l in body:
+            s = l.strip()
+            if not s.startswith('\u2610'):
+                continue
+            # 五个档位常写在同一行（全角空格分隔）→ 按勾选框切分，逐档去空白
+            for seg in s.split('\u2610'):
+                seg = seg.strip().strip('\u3000').strip()
+                if seg:
+                    opts.append(seg)
+        if opts:
+            home_note['勾选档位'] = opts
+        kv = parse_bold_kv(body)
+        for k in ('分版与发放', '四档与课堂 LOS 对齐', '回填落点'):
+            if k in kv:
+                home_note[k] = kv[k]
+        for l in body:
+            s = l.strip()
+            if s.startswith('**条首') and '**：' in s:
+                home_note['条首'] = s.split('**：', 1)[1].strip()
+            elif s.startswith('**条末') and '**：' in s:
+                home_note['条末'] = s.split('**：', 1)[1].strip()
+            elif s.startswith('题面：'):
+                home_note['题面'] = s.split('：', 1)[1].strip()
+
     # ---- 组装 lessons ----
     lessons = []
     for i in range(1, n + 1):
@@ -469,6 +542,7 @@ def derive(text):
             'objectives_matrix': mx,
             'inquiry_activities': inquiries.get(i, []),
             'board_layout': boards.get(i, ''),
+            '重难点': keypoints.get(i, {}),
             '分层作业': {
                 'A': hw.get('A', ''),
                 'B': hw.get('B', ''),
@@ -491,6 +565,8 @@ def derive(text):
             '单课时时长分钟': dur,
             '课型': meta_raw.get('课型', ''),
             '教学方法': meta_raw.get('教学方法', ''),
+            '教材分析': textbook,
+            '学情分析': learner,
             '教材': {
                 '版本': meta_raw.get('教材版本', textbook_note),
                 '册次': '',
@@ -507,6 +583,7 @@ def derive(text):
             'behavior_card': behavior_card,
             'reinforcement_schedule': reinf,
             'progression_rules': prog,
+            '人力协同': staffing,
         },
         'generalization': gen,
         'safety_alternatives': safety,
