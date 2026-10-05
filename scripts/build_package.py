@@ -32,7 +32,7 @@ import zipfile
 import tempfile
 import hashlib
 
-ENGINE_VERSION = '3.14.0'
+ENGINE_VERSION = '3.15.0'
 ZIP_STAMP = (2020, 1, 1, 0, 0, 0)   # 固定时间戳 → 字节幂等
 
 REPORT_DIR = os.path.join(tempfile.gettempdir(), 'peizhi_shuangmai')
@@ -89,6 +89,16 @@ def main():
         rep.append('拒绝打包：description 须非空、≤1024 字符、不含 XML 标签')
         open(report_path('build_package_report.txt'), 'w', encoding='utf-8').write('\n'.join(rep))
         return 1
+
+    # ①b 主文件体积封顶（3.15.0 新增）：上传轨此前只校验 frontmatter，体积超限照样打包——
+    # 而主文件是每层会话都要整体读入的路由层，膨胀直接抬升上下文成本。按**落盘字节**判定，
+    # 与 regression_check 同口径（二进制读取，不受换行归一化影响）。
+    _sz = len(open(os.path.join(root, 'SKILL.md'), 'rb').read())
+    if _sz > 12288:
+        rep.append('拒绝打包：SKILL.md 体积 %d 字节 > 12KB(12288) 上限，请先瘦身再打包' % _sz)
+        open(report_path('build_package_report.txt'), 'w', encoding='utf-8').write('\n'.join(rep))
+        return 1
+    rep.append('SKILL.md 体积校验：%d 字节（上限 12288，余量 %d）' % (_sz, 12288 - _sz))
 
     # ② 收集入包文件（arcname → 绝对路径）
     files = {'%s/SKILL.md' % name: os.path.join(root, 'SKILL.md'),

@@ -89,6 +89,40 @@ def sec_body(text, key):
     return '\n'.join(out)
 
 
+def para_block(text, key):
+    """从 key 首次出现的行起取到本块结束（下一个标题行／下一个 `**` 粗体块／非列表续行）。
+
+    3.15.0：用于替换 `text.split(key)[1][:1200]` 这类**固定长度窗口**取块。窗口取块是
+    本项目明令禁止却在本文件内复发的写法——sec_body 的注释（上方第 ① 条）写着禁用，
+    代码里却用 `[:1200]` 切 Gate-A 块：一旦四要素写得稍长，窗口外的要素就被切走，
+    于是"内容完好却误报 FAIL"。块一律按结构边界取，不按字数取。
+    """
+    lines = text.replace('\r\n', '\n').split('\n')
+    start = None
+    for i, l in enumerate(lines):
+        if key in l:
+            start = i
+            break
+    if start is None:
+        return ''
+    out = [lines[start]]
+    for j in range(start + 1, len(lines)):
+        s = lines[j]
+        if re.match(r'^#{1,6}\s', s):
+            break
+        if not s.strip():
+            k = j + 1
+            while k < len(lines) and not lines[k].strip():
+                k += 1
+            if k < len(lines) and re.match(r'^\s*([-*]|\d+[.、)])\s', lines[k]):
+                continue
+            break
+        if re.match(r'^\*\*', s):
+            break
+        out.append(s)
+    return '\n'.join(out)
+
+
 def material_section_body(text):
     """取「材料清单」小节全文（供闭环断言定位，避免全文子串被别处同名词兜住）。"""
     return sec_body(text, '材料清单')
@@ -447,8 +481,14 @@ def check(path):
     safe = [b for b in bs if b and '安全替代' in b[0]]
     r.append(('安全替代表三列(含风险列)', bool(safe) and len(cells(safe[0][0])) == 3 and '风险' in safe[0][0]))
 
-    # 9 板书版式为代码块
-    r.append(('板书为版式代码块', bool(re.search(r'### 板书与图卡设计\s*\n\s*```', text))))
+    # 9 板书版式为代码块（3.15.0 改为分课时：标题后先有「第N课时板书」标记，再各跟代码块，
+    #    原先"标题紧邻 ```"的写法对分课时板书不再成立，且会误判新版式为不合规范）
+    _bsec = sec_body(text, '板书与图卡设计')
+    _nblk = len(re.findall(r'^```', _bsec, re.M)) // 2
+    r.append(('板书为版式代码块', _nblk >= 1, '%d个代码块' % _nblk))
+    if n_less > 1:
+        r.append(('板书按课时分块(禁一板通用)', _nblk >= n_less,
+                  '%d块/%d课时' % (_nblk, n_less)))
 
     # 10 教务归档视图含课标锚点三级（≥2 个“·”分隔）
     arch = text.split('教务归档视图')[1] if '教务归档视图' in text else ''
@@ -793,7 +833,8 @@ def check_schema(root, ev=''):
                       not _has_gate if not _conf else True,
                       '出口=%s Gate-A块=%s' % (jg.get('确定方式'), _has_gate)))
             if _has_gate:
-                _gb = _md2.split('Gate-A 确认记录', 1)[1][:1200]
+                # 3.15.0：改按结构边界取块（原为固定 1200 字符窗口，见 para_block 注释）
+                _gb = para_block(_md2, 'Gate-A 确认记录')
                 rr.append((tag + ' Gate-A块含四要素(事项/备选/确认结果/结论)',
                           all(k in _gb for k in ('确认事项', '备选项', '确认结果', '确认后结论'))))
                 rr.append((tag + ' Gate-A确认结果留占位符(待教师填)',
@@ -827,6 +868,29 @@ def check_schema(root, ev=''):
         rr.append((tag + ' JSON 每课时分钟合计==%d' % dur, time_ok, ' '.join(detail)))
         rr.append((tag + ' JSON 每课时目标矩阵≥9格', matrix_ok))
         rr.append((tag + ' JSON 每课时探究活动≥1', inq_ok))
+        # 3.15.0 板书独立：domain-core 要求"每课时自成闭环…独立板书"，而派生器此前把
+        # 节内第一个代码块复制给全部课时（三课时 board_layout 完全雷同）且不报错。
+        _bd = [ls.get('board_layout', '') for ls in lessons]
+        rr.append((tag + ' 每课时板书非空(独立板书)', all(x.strip() for x in _bd),
+                   '空%d/%d' % (sum(1 for x in _bd if not x.strip()), len(_bd))))
+        if len(_bd) > 1:
+            rr.append((tag + ' 多课时板书互不相同(禁一板通用)', len(set(_bd)) == len(_bd),
+                       '%d种/%d课时' % (len(set(_bd)), len(_bd))))
+        # 3.15.0 探究流程守恒：派生器曾写 `'流程': teacher[:120]` 固定窗口截断，JSON 侧
+        # 的探究流程永远缺尾巴。守恒判据＝JSON 每条流程必须在源稿中找到**完全相等**的
+        # 教师活动单元格（一旦被截断就再也等不上，且不需要预测截断长度）。
+        _src_inq = []
+        if mdp and os.path.exists(mdp):
+            for _l in open(mdp, encoding='utf-8').read().replace('\r\n', '\n').split('\n'):
+                if '【探究活动】' in _l and _l.strip().startswith('|'):
+                    _c = [x.strip() for x in _l.strip().strip('|').split('|')]
+                    if len(_c) > 1:
+                        _src_inq.append(_c[1])
+        _j_inq = [q.get('流程', '') for ls in lessons for q in ls.get('inquiry_activities', [])]
+        _bad = [x for x in _j_inq if x not in _src_inq]
+        rr.append((tag + ' 探究流程与源稿逐字相等(禁截断)',
+                   bool(_j_inq) and not _bad,
+                   '' if not _bad else '不等%d/%d' % (len(_bad), len(_j_inq))))
 
         los_ok, code_ok = True, True
         for row in data['los_table']:
@@ -928,6 +992,12 @@ def check_derived(root, ev=''):
                   'D=%s SKILL=%s' % (D.ENGINE_VERSION, ev)))
     except Exception as e:
         r.append(('可导入 md_to_docx', False, str(e)))
+    try:
+        import mutation_check as MU
+        r.append(('变异测试脚本版本与引擎一致', MU.ENGINE_VERSION == ev,
+                  'MU=%s SKILL=%s' % (MU.ENGINE_VERSION, ev)))
+    except Exception as e:
+        r.append(('可导入 mutation_check(反向变异已入库)', False, str(e)[:60]))
     files = sorted(glob.glob(os.path.join(root, 'examples', '*.md')))
     for f in files:
         nm = os.path.basename(f)
@@ -1150,8 +1220,15 @@ def check_skill_md(root):
               '出现%d次' % (wf_txt.count('教材/学情分析') + wf_txt.count('教材分析·学情分析'))))
     # 2.6.0 渐进式披露元断言：①主文件体积封顶（防细则回流膨胀）②细则层无孤儿文件
     #   ③主文件常驻关键枚举（LOS/BOPPPS/分层/判据三段式）
-    size = len(text.encode('utf-8'))
-    r.append(('SKILL.md 体积≤12KB(渐进式披露防膨胀)', size <= 12288, '%d字节' % size))
+    # 体积按**落盘真实字节**计（3.15.0 修口径）：此前 `len(text.encode('utf-8'))` 用的是
+    # 文本模式读取的结果，universal newlines 已把 CRLF 归一成 LF —— 工作区 core.autocrlf=true
+    # 时每行多出的 \r 被抹掉，实测磁盘 12363 字节被算成 12270，于是"上传轨实际交付的
+    # SKILL.md 超 12KB"却判 PASS。**上传什么就必须验什么**：一律按二进制原始字节判定。
+    size = len(open(p, 'rb').read())
+    r.append(('SKILL.md 体积≤12KB(渐进式披露防膨胀·按落盘字节)', size <= 12288, '%d字节' % size))
+    # 余量哨兵：12288 只剩十几字节时，任何一次增补都会静默越界。留 ≥256B 缓冲。
+    r.append(('SKILL.md 体积余量≥256B(防下次增补即越界)', size <= 12288 - 256,
+              '余量%d字节' % (12288 - size)))
     orphan = [os.path.basename(x) for x in sorted(glob.glob(os.path.join(root, 'references', '*')))
               if os.path.isfile(x) and os.path.basename(x) not in text]
     r.append(('references/ 无孤儿文件(均被主文件引用)', not orphan, ','.join(orphan)))

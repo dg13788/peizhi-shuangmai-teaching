@@ -1,0 +1,19 @@
+# —— 培智·双脉教学引擎 · 换行符统一规则（3.15.0 立）——
+#
+# 起因：本机 core.autocrlf=true，检出时 LF→CRLF、提交时 CRLF→LF。于是同一个 SKILL.md
+#   有三套字节数——「库中 12270／工作区 12363／上传包随工作区」——而 12KB 铁律的断言
+#   用文本模式读取（universal newlines 又把 CRLF 归一回 LF），算出 12270 判 PASS，
+#   实际上交付到技能平台的主文件是 12363 字节、**已经越界**。换行符是"看不见的字节"，
+#   最容易让体积/幂等类断言失真，故在此钉死：交付相关文本一律 LF，两端同口径。
+#
+# 说明：*.docx 是二进制，不受本规则影响；dist/ 不入库。
+
+* text=auto eol=lf
+
+*.md   text eol=lf
+*.json text eol=lf
+*.py   text eol=lf
+*.txt  text eol=lf
+LICENSE text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf

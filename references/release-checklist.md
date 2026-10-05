@@ -17,7 +17,7 @@
 
 - [ ] 已用 `python scripts/build_package.py` 产出 `dist/peizhi-shuangmai-teaching.zip`（**禁止手工拼装**；打包器已强制 frontmatter 必检＋入包全文红区扫描，失败即拒绝出包）
 - [ ] zip 顶层为技能名目录 `peizhi-shuangmai-teaching/`，目录内根路径存在 `SKILL.md`
-- [ ] 包内仅含：`SKILL.md`、`scripts/`（四脚本）、`references/`（契约/格式基线/清单/LICENSE.md）、`examples/`（md＋JSON）
+- [ ] 包内仅含：`SKILL.md`、`scripts/`（五脚本：派生／生成／打包／回归／**变异**）、`references/`（契约/格式基线/清单/LICENSE.md）、`examples/`（md＋JSON）
 - [ ] 包内**无**：README/CHANGELOG/CONTRIBUTING/.gitignore、`.git/.workbuddy/dist`、`*_report.txt`、`*.docx`、锚定单/内容提取卡等会话产物
 - [ ] frontmatter 合规：必填 `name`（小写+连字符、≤64、不含 agentkit）＋ `description`（≤1024 字符、无 XML 标签）；`version` 为 SemVer 三段；顶层字段不超出白名单（license/compatibility/metadata/allowed-tools）
 - [ ] SKILL.md 行数 ≤500（渐进式披露，长内容拆 references/）
@@ -31,7 +31,8 @@
 
 ## 四、版本一致性与回归最小集（发布前必跑）
 
-- [ ] 版本号**八处一致**：① SKILL.md frontmatter `version` ② SKILL.md 正文标题 `Vx.y.z` ③ `references/output-schema.json` 的 `schema_version const` ④ `scripts/md_to_json.py` ⑤ `scripts/md_to_docx.py` ⑥ `scripts/build_package.py` 三处 `ENGINE_VERSION` ⑦ `CHANGELOG.md` 当前条目 ⑧ `README.md` 标题与"版本与兼容性"段；示例 JSON `schema_version` 随派生同步（回归自动校验，脚本版本以 SKILL.md frontmatter 为唯一真源，禁在脚本内硬编码）
+- [ ] 版本号**九处一致**：① SKILL.md frontmatter `version` ② SKILL.md 正文标题 `Vx.y.z` ③ `references/output-schema.json` 的 `schema_version const` ④ `scripts/md_to_json.py` ⑤ `scripts/md_to_docx.py` ⑥ `scripts/build_package.py` ⑦ `scripts/mutation_check.py`（3.15.0 起）⑧ `CHANGELOG.md` 当前条目 ⑨ `README.md` 标题与"版本与兼容性"段；示例 JSON `schema_version` 随派生同步（回归自动校验，脚本版本以 SKILL.md frontmatter 为唯一真源，禁在脚本内硬编码）
+- [ ] **主文件体积**：按**落盘字节**计 `SKILL.md` ≤ 12288 且余量 ≥256B（3.15.0 起）——本机 `core.autocrlf=true` 会让工作区比库内多出每行 1 字节，文本模式读取会把它归一化掉而低估；`.gitattributes` 已钉死 `eol=lf`，打包器亦已设闸（越界拒绝出包）
 - [ ] 示例教案实跑：多课时（2~3 课时）各 1 篇，产出一致（每课时五列表〔BOPPPS 步别、≥1 探究活动、时间合计=该课时时长〕、分课时目标矩阵、LOS 表逐课时成对列且全生覆盖）
 - [ ] **跨课时行为干预**：支持卡六要素齐全、强化计划逐课时削弱（连续→FR2→变动＋社会性）、晋级降级阈值含 80% 判据、危机处置四条红线（禁体罚、禁惩罚性隔离、禁强制进食、禁当众批评）；出现 N 的学生不计学业判据
 - [ ] **无障碍基线**：成品 Word 的版式（宋体小四 1.5 倍行距、表格≥9pt、A4 与页边距、表头跨页重复、页脚页码）由生成器固化，`--check` 抽检全 **SAME**；教师另制的可视材料规格已在 examples「配套件 · 学生可视材料规格」落位——图卡标签≥24pt、关键句≥36pt、**低视力生再放大**（图卡标签≥36pt、学习单正文≥18pt，禁低于图卡标签基线），对比度≥7:1 且不低于 4.5:1、色彩不得仅依赖颜色区分、黑体无衬线、线条≥1.5pt
@@ -39,6 +40,7 @@
 - [ ] **结构化输出契约**：`examples/*结构化输出样例.json` 合 `references/output-schema.json`（`anchors` 每条三级齐全），且 `schema_version` 与 SKILL.md `version` 一致
 - [ ] **Word 成品**：已用 `python scripts/md_to_docx.py <成品目录>` 生成（禁手工排版），`--check` 判定成品≡源稿且字节幂等；结构校验全过（封面独立节无页码、**页脚仅 `PAGE` 字段、"第 X 页"**（3.4.0 起不再列总页数：多节文档下 `SECTIONPAGES` 按本节页数计、`NUMPAGES` 计入无页码封面，两者必失真）、A4 与页边距、表头跨页重复、列宽合计=版心、五列表列宽比、占位符保留、零引擎元信息、红区干净）；PDF 通道已移除（3.0.0 起仅交付 Word）
 - [ ] `python scripts/regression_check.py` 全项 PASS（通过率达 100%，项数以报告为准），报告写系统临时目录 `peizhi_shuangmai/regression_report.txt`
+- [ ] **反向变异**：`python scripts/mutation_check.py` 全部用例**被捕获**（3.15.0 起强制）。此前每轮都声称"N/N 捕获"却每次临时手写、脚本从未入库，验证无法复现也无法在发布时被执行；现已固化为 `scripts/mutation_check.py`。**"未捕获"＝该断言是装饰性的，须修断言而非修用例**；脚本内含 `try/finally` 字节还原与"变异须重跑派生"等踩坑铁律
 - [ ] 引擎规则变更而示例未同步＝破坏性变更：已升大版本并回改 examples 基准
 
 ---
@@ -55,7 +57,7 @@
 | 合规确认 | ☐ 待作者确认 | 职务作品书面确认需作者本人签署 |
 | 回归测试最小集① 示例实跑 | ☑ 通过 | 两份多课时基准结构齐全 |
 | 回归测试最小集② 附件识别 | ☐ 需实跑环境 | 依赖平台附件上传/OCR 能力，上架前在目标平台实跑 1 次 |
-| 回归测试最小集③ Word 成品 | ☐ 需实跑环境 | 上架前在文件系统环境实跑 1 次并过 §4 核验 |
+| 回归测试最小集③ Word 成品 | ☐ 需实跑环境 | 上架前在文件系统环境实跑 1 次并过 `references/format-baseline.md` 核验 |
 | 回归测试最小集④ 全库红区扫描 | ☑ 通过 | 见上 |
 
 > 说明：②③ 两项为运行态回归（依赖平台 OCR 与本地文档生成环境），正式发布前须在实跑环境补跑。
@@ -193,3 +195,25 @@
 | 成品核验 | ☑ 通过 | `--check` SAME 2/2；解 zip 读 `word/document.xml` 文本级核验；`build_package.py` 重建包 |
 
 > 待办：仓库 `git` HEAD 仍停在 `v2.5.0`，2.6.0~3.14.0 的改动尚未提交，需由作者择机提交（跨 9 个次版本，建议按 2.6.0／3.0.0／3.8.0／3.9.0／3.10.0／3.11.0／3.12.0／3.13.0／3.14.0 分条提交以便回溯）。
+>
+> **已于 2026-10-05 完成**：按版本重建为 7 条提交（3.8.0~3.14.0）并推送至 `origin/main`。
+> 本地历史与远端曾在 v1.0 之后分叉（各有一个同名不同 SHA 的 v3.7.0），逐对比对确认
+> v2.0／v2.4.0／v2.5.0／v3.7.0 四对的 **tree 完全相同**⇒ 本地是远端的等价重放，
+> 遂以 `git rebase --onto` 把 7 条新提交接到远端主线上，**零冲突、无需强推**，
+> 末端 tree 与变基前逐字节一致。远端 `main` = `aa6b1bb`。
+
+### v3.15.0 · 2026-10-06 · 体积口径 × 板书独立 × 变异入库
+
+| 核验项 | 结论 | 依据 |
+| --- | --- | --- |
+| 12KB 体积口径（P0） | ☑ 修复 | 本机 `core.autocrlf=true` ⇒ 同一 `SKILL.md` 三套字节：库中 12270／工作区 12363／上传包随工作区。断言用文本模式读取（CRLF 被归一化）算出 12270 判 PASS，**实际交付包超限 75 字节**。改为 `open(p,'rb').read()` 按落盘字节判定；打包器加体积闸（越界拒绝出包）；新增余量≥256B 哨兵（原余量仅 18B，任何增补都会静默越界） |
+| 换行三口径统一 | ☑ 修复 | 新增 `.gitattributes`（交付文本一律 `eol=lf`）＋ `md_to_json.py` 写盘固定 `newline='\n'`，18 个文件由 CRLF 转为 LF。消除"库内／工作区／上传包"漂移的根因 |
+| 主文件瘦身 | ☑ 通过 | 12270 → **11966 字节**（余量 322）。方式：把已外置到 `format-baseline.md` 的详尽参数改回指向式表述（版式清单、教师 30 秒自查），未删任何铁律／枚举／索引 |
+| 板书独立（P0） | ☑ 修复 | 派生器只取节内**第一个**代码块复制给全部课时 ⇒ 三课时 `board_layout` 完全相同，与 `domain-core`「每课时独立板书」冲突且不报错。改为按节内「第N课时」标记定位；源稿补分课时板书（好吃的水果 3 块／认识5 2 块）；新增「每课时板书非空」＋「多课时板书互不相同」两条断言 |
+| 固定窗口取段复发 | ☑ 修复 | 本文件/脚本第 72 行注释明令禁用 `split(key)[1][:600]`，代码里却用 `[:1200]` 切 Gate-A 块 ⇒ 新增 `para_block()` 按结构边界取块（下一标题行／下一 `**` 块／非列表续行） |
+| 探究流程截断 | ☑ 修复 | `'流程': teacher[:120]` 使 JSON 探究步骤永远缺尾巴 ⇒ 去掉截断，新增守恒断言「JSON 流程 ≡ 源稿教师活动单元格逐字相等」 |
+| 交叉引用整改 | ☑ 修复 | 27 处绝对编号 →「文件·节名」。含两处**事实错误**（`glossary.md` 把红区与 `{{}}` 占位符标成"铁律 3"，实为铁律 1）与若干**悬空引用**（"见 §3 路由""见 §0 晋级阈值""见 §5 表号规则"——所指节名在被引文件中并不存在）。另修 `format-baseline.md` 引用自身行号的脆弱写法 |
+| 反向变异入库（治理） | ☑ 通过 | 3.12~3.14 每轮都声称"N/N 捕获"，脚本却**每次临时手写、从未留存**——验证不可复现，发布清单里也没有这一步。本版固化为 `scripts/mutation_check.py`（8 用例，含 1 个反向对照），纳入版本一致性校验与本清单发布步骤 |
+| 断言可证伪 | ☑ 通过 | **反向变异 8/8 捕获**：M1 换行膨胀／M1b 对照（退回文本模式后**确实漏判** 525 项全绿，反证旧口径失真）／M2 板书回退／M3 流程截断／M4 课时序号回退／M5 感官静默丢弃／M6 Gate-A 窗口／M7 打包器体积闸。全部 `try/finally` 按原始字节还原 |
+| 变异脚本自身的坑 | ☑ 记录 | 首轮 4 例"未捕获"实为**变异太轻**：M3 截断未触发（样例仅 60~80 字 < 120）／M5 未知维度未造出（continue 走不到）／M6 窗口未撑爆（填充仅 800 字）；M7 系用例**语义写反**。判定顺序恒为"先看变异够不够狠，再改断言"，已写入脚本注释 |
+| 打包与核验 | ☑ 通过 | 重建 zip 并解包核验；`--check` SAME 2/2 |

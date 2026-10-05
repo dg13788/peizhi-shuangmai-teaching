@@ -45,7 +45,7 @@ import hashlib
 import datetime
 import tempfile
 
-ENGINE_VERSION = '3.14.0'
+ENGINE_VERSION = '3.15.0'
 
 REPORT_DIR = os.path.join(tempfile.gettempdir(), 'peizhi_shuangmai')
 

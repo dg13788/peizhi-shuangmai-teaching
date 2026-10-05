@@ -16,7 +16,7 @@ import sys
 import glob
 import tempfile
 
-ENGINE_VERSION = '3.14.0'
+ENGINE_VERSION = '3.15.0'
 
 REPORT_DIR = os.path.join(tempfile.gettempdir(), 'peizhi_shuangmai')
 
@@ -309,7 +309,10 @@ def derive(text):
                         '分钟': minutes,
                         '版本': {'A': '见支持策略列·A', 'B': '见支持策略列·B', 'C': '见支持策略列·C'},
                         '材料': [],
-                        '流程': teacher[:120],
+                        # 3.15.0：去掉 [:120] 固定窗口截断——探究流程是教师照着做的步骤，
+                        # 截断后 JSON 侧永远缺尾巴，且这种"悄悄切一刀"正是本项目反复
+                        # 出事的老写法（见 sec_body 注释里的两条禁忌）。
+                        '流程': teacher,
                         '支持策略': versions,
                     })
             if tl:
@@ -318,13 +321,33 @@ def derive(text):
                 inquiries[idx] = inq
 
     # ---- 板书（代码块）----
+    # 3.15.0 修「取第一个」：此前只取节内**第一个**代码块并复制给全部课时，而 domain-core
+    # 要求"每课时自成闭环…独立板书"——于是三课时 board_layout 完全雷同，"独立板书"在
+    # 结构化契约里被无声违反且不报错。改为按节内「第N课时」标记定位各自代码块；
+    # 源稿未标课时（旧稿）时退回"通用板书填全部"，保证向后兼容。
     b_sec = find_sec(secs, '板书')
     if b_sec:
-        body = '\n'.join(b_sec[2])
-        mm = re.search(r'```\n(.*?)```', body, re.S)
-        if mm:
-            for i in range(1, n + 1):
-                boards[i] = mm.group(1).strip()
+        _cur, _buf, _inblk = 0, [], False
+        for _l in b_sec[2]:
+            if _l.strip().startswith('```'):
+                if _inblk:
+                    _blk = '\n'.join(_buf).strip()
+                    if _blk:
+                        if _cur:
+                            boards[_cur] = _blk
+                        else:
+                            for _i in range(1, n + 1):
+                                boards.setdefault(_i, _blk)
+                    _buf, _inblk = [], False
+                else:
+                    _inblk, _buf = True, []
+                continue
+            if _inblk:
+                _buf.append(_l)
+                continue
+            _li = lesson_idx(_l)
+            if _li:
+                _cur = _li
 
     # ---- LOS 记录表 ----
     los_table = []
@@ -648,7 +671,10 @@ def main():
         data = derive(text)
         name = '%s_结构化输出样例.json' % data['meta']['课题']
         p = os.path.join(outdir, name)
-        json.dump(data, open(p, 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
+        # newline='\n'（3.15.0）：Windows 默认会把 '\n' 落成 CRLF，而 .gitattributes 已钉死
+        # eol=lf —— 两边不一会导致每次派生后 git 显示"整份 JSON 全变"，且字节数与库中不一致。
+        with open(p, 'w', encoding='utf-8', newline='\n') as _f:
+            json.dump(data, _f, ensure_ascii=False, indent=2)
         wrote.append((name, len(json.dumps(data, ensure_ascii=False))))
     # 结果写盘（避免 stdout 编码问题）
     rep = ['派生完成：%d 个文件' % len(wrote)]
