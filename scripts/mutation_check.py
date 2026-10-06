@@ -27,7 +27,7 @@ import sys
 import subprocess
 import tempfile
 
-ENGINE_VERSION = '3.15.0'   # 与 SKILL.md frontmatter 同源，回归自动校验（第 9 处）
+ENGINE_VERSION = '3.16.0'   # 与 SKILL.md frontmatter 同源，回归自动校验（第 9 处）
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = sys.executable
@@ -44,7 +44,9 @@ JSON1 = os.path.join(ROOT, 'examples', '好吃的水果_结构化输出样例.js
 JSON2 = os.path.join(ROOT, 'examples', '认识5_结构化输出样例.json')
 
 # 所有可能被变异写坏的文件，一律纳入备份/还原集
-FILES = [SKILL, MD_JSON, MD_DOCX, REG, BUILD, SAMPLE, JSON1, JSON2]
+CS = os.path.join(ROOT, 'references', 'curriculum-standards.md')
+
+FILES = [SKILL, MD_JSON, MD_DOCX, REG, BUILD, SAMPLE, JSON1, JSON2, CS]
 
 out = []
 
@@ -278,6 +280,79 @@ def main():
     log('        缺陷：上传轨此前只校验 frontmatter，体积越界照样产出 zip')
     log('        结果：%s' % d7)
     log()
+
+    # ===== 3.16.0 新增：课标错引（用户实测"备课美术"被引向普校＋聋校拼凑）=====
+    # 变异强度核对：注入必须是**真替换**（不是追加），否则原文仍在、白名单与
+    # "书名与学科一致"两条会因"真书还在"而放过去，得到"变异太轻"的假性未捕获。
+    _BOOK = '《培智学校义务教育生活语文课程标准（2016年版）》'
+
+    def m8():
+        t = read(SAMPLE).decode('utf-8')
+        assert _BOOK in t
+        write(SAMPLE, t.replace(_BOOK, '《聋校义务教育美术课程标准》').encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M8 课标错引·换成聋校课标（"美术"实测拼凑源之一）',
+        '培智无"美术"这门课，正式科目是绘画与手工；不拦就会顺别名滑向聋校/普校课标',
+        m8, '未引用普校2022版/聋校/盲校课标'))
+
+    def m9():
+        t = read(SAMPLE).decode('utf-8')
+        assert _BOOK in t
+        write(SAMPLE, t.replace(_BOOK, '《义务教育艺术课程标准（2022年版）》').encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M9 课标错引·套用普校2022版课标',
+        '2022 年版是普通学校课标，不可套用于培智学校——这是混淆的头号源头',
+        m9, '未引用普校2022版/聋校/盲校课标'))
+
+    def m10():
+        t = read(SAMPLE).decode('utf-8')
+        assert '| 学科 | 生活语文 |' in t
+        write(SAMPLE, t.replace('| 学科 | 生活语文 |', '| 学科 | 美术 |').encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M10 教案头学科写成别名"美术"且未留对齐凭证',
+        '学科名不落培智10门＝后续课标引用必然走偏；别名命中还须留"对齐为"凭证',
+        m10, '教案头学科属培智10门课'))
+
+    def m11():
+        t = read(SAMPLE).decode('utf-8')
+        assert '- 倾听与说话 ｜' in t
+        write(SAMPLE, t.replace('- 倾听与说话 ｜', '- 课程总目标 ｜', 1).encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M11 锚点第一级用课标篇章名（课程总目标）',
+        '认识5 曾把「课程总目标」「教学建议」当锚点一级；篇章名不能充当教学目标依据',
+        m11, '锚点第一级非课标篇章名'))
+
+    def m12():
+        # 整段摘掉 3.16.0 新增的课标断言，回到"只验锚点里「·」≥2"的旧写法
+        t = read(REG).decode('utf-8')
+        i = t.index('    # ===== 3.16.0 新增：课标引用口径')
+        j = t.index('    return name, r', i)
+        write(REG, (t[:i] + t[j:]).encode('utf-8'))
+        s = read(SAMPLE).decode('utf-8')
+        assert _BOOK in s
+        write(SAMPLE, s.replace(_BOOK, '《义务教育艺术课程标准（2022年版）》').encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M12 对照：摘掉课标断言、退回只验锚点格式的旧写法',
+        '反证新增的书名白名单/黑名单确实在干活：摘掉后再注假课标，回归应重新变绿（＝漏判）',
+        m12, '未引用普校2022版/聋校/盲校课标', negative=True))
+
+    # ── M13 课标口径漂移：细则里删掉「绘画与手工」整行 ──────────────────
+    # 守恒（不是枚举）的意义：只要细则少记一门，代码表就再也拦不住该科的错引，
+    # 而两边都不会报错。故"细则→代码"这一侧也必须能变红。
+    def m13():
+        t = read(CS).decode('utf-8')
+        rows = [l for l in t.split('\n') if l.startswith('| 6 |') and '绘画与手工' in l]
+        assert rows, '未定位到绘画与手工行'
+        write(CS, t.replace(rows[0] + '\n', '').encode('utf-8'))
+    results.append(run_case(
+        'M13 课标索引漏记「绘画与手工」（口径双向守恒）',
+        '细则少一门 ⇒ 该科错引再也拦不住，且两侧均静默——守恒断言必须当场变红',
+        m13, '课标索引科目表'))
 
     total, caught = len(results), sum(1 for x in results if x)
     log('=' * 64)

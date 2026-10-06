@@ -162,6 +162,42 @@ def md_sensory_rows(md_path):
     return out
 
 
+# ===== 3.16.0 新增：课标引用口径（禁错引 / 防跨体系拼凑）=====
+# 背景（真实缺陷）：教师报"美术"时，引擎未引用《培智学校义务教育绘画与手工课程标准
+# （2016年版）》，而是拿普校 + 聋校课标拼凑。根因之一是本文件原先只断言"课标锚点里
+# `·` ≥ 2 个"——**只验格式、不验引用的是哪一部课标**，拼凑出来的假课标照样 PASS。
+# 口径源：references/curriculum-standards.md（教育部教基二〔2016〕5 号，2017 秋执行，现行有效）。
+# ⚠ 枚举口径**禁硬相等**（历史教训：硬相等会反过来保护"少一条"的缺陷）；
+#   本表只允许**扩充**，且新增科目须同步进 curriculum-standards.md，否则属孤儿口径。
+CURR_SUBJECTS = {
+    '生活语文': ['倾听与说话', '识字与写字', '阅读', '写话与习作', '综合性学习'],
+    '生活数学': ['常见的量', '数与运算', '图形与几何', '统计', '综合与实践'],
+    '生活适应': ['个人生活', '家庭生活', '学校生活', '社区生活', '国家与世界'],
+    '劳动技能': ['自我服务劳动技能', '家务劳动技能', '公益劳动技能', '简单生产劳动技能'],
+    '唱游与律动': ['感受与欣赏', '演唱', '音乐游戏', '律动'],
+    '绘画与手工': ['造型·表现', '设计·应用', '欣赏·评述', '综合·探索'],
+    '运动与保健': ['运动参与', '运动技能', '身体健康', '心理健康'],
+    '信息技术': ['身边的信息技术', '计算机的应用', '计算机网络的应用'],
+    '康复训练': ['动作训练', '感知觉训练', '沟通与交往训练', '情绪与行为训练'],
+    '艺术休闲': ['休闲认知', '休闲选择', '休闲技能', '休闲伦理'],
+}
+# 教师口头说法 → 培智课标正式科目。培智体系**没有"美术"**，普校/聋校有美术、盲校有美工，
+# 三者并存时若无显式映射，模型会滑向普校/聋校课标拼凑。
+CURR_ALIAS = {
+    '美术': '绘画与手工', '画画': '绘画与手工', '美工': '绘画与手工',
+    '音乐': '唱游与律动', '唱歌': '唱游与律动',
+    '体育': '运动与保健', '体操': '运动与保健',
+    '语文': '生活语文', '识字': '生活语文',
+    '数学': '生活数学', '算术': '生活数学',
+    '劳动': '劳动技能', '家政': '劳动技能',
+    '计算机': '信息技术', '电脑': '信息技术',
+    '感统': '康复训练', '言语': '康复训练',
+    '休闲': '艺术休闲', '常识': '生活适应', '品德': '生活适应',
+}
+# 课标中属于"篇章名"而非"内容领域"的头衔——它们不能充当锚点第一级
+CURR_NON_DOMAIN = ('课程总目标', '学段目标', '教学建议', '评价建议', '实施建议')
+
+
 def check(path):
     name = os.path.basename(path)
     text = open(path, encoding='utf-8').read()
@@ -701,6 +737,62 @@ def check(path):
                   '%s/%s' % (jn.group(1) if jn else '?', n_less)))
         r.append(('研判依据含三阶切分口径(感知→理解→表达/应用)',
                   '感知' in jseg and ('应用' in jseg or '泛化' in jseg)))
+
+    # ===== 3.16.0 新增：课标引用口径（只验格式不验真伪＝第六种"虚假的绿"）=====
+    sm = re.search(r'\|\s*学科\s*\|\s*([^|]+?)\s*\|', text)
+    subj = sm.group(1).strip() if sm else ''
+    r.append(('教案头学科属培智10门课', subj in CURR_SUBJECTS, subj or '未填学科'))
+
+    # 书名白名单：正文出现的每部课标书名都须形如《培智学校义务教育{科目}课程标准（2016年版）》
+    books = re.findall(r'《[^》]*?课程标准[^》]*?》', text)
+    bad_book = [b for b in books
+                if not re.fullmatch(
+                    r'《培智学校义务教育(%s)课程标准（2016年版）》' % '|'.join(CURR_SUBJECTS), b)]
+    r.append(('课标书名属培智2016年版白名单', not bad_book, ','.join(bad_book[:3])))
+
+    # 黑名单：普校 2022 版／聋校／盲校课标一律不得出现——跨体系拼凑的头号症状
+    banned = [b for b in books if ('2022年版' in b or '聋校' in b or '盲校' in b)]
+    r.append(('未引用普校2022版/聋校/盲校课标', not banned, ','.join(banned[:3])))
+
+    # 锚点第一级必须落在该科"一级领域"枚举内，且不得是课标篇章名
+    # ⚠ 不能用 sec_body(text,'课标锚点')：样例中「## 二、课标锚点、教材分析与学情分析」是
+    #   `##` 级大节、同样含"课标锚点"四字且排在前面，会先被命中 → 取到空段、锚点数恒为 0
+    #   （又一处"取第一个"陷阱，3.16.0 当场复现）。故先定位"以课标锚点开头"的标题行本身，
+    #   再以其完整标题为 key 取段。
+    ah = next((l.strip().lstrip('#').strip()
+               for l in text.replace('\r\n', '\n').split('\n')
+               if re.match(r'^#{1,4}\s*课标锚点', l)), '')
+    asec = sec_body(text, ah) if ah else ''
+    lv1 = [x.strip() for x in re.findall(r'^-\s*([^｜\n]+?)\s*｜', asec, re.M)]
+    r.append(('课标锚点节有锚点条目', len(lv1) >= 1, '实%d条' % len(lv1)))
+    if subj in CURR_SUBJECTS:
+        bad1 = [x for x in lv1 if x not in CURR_SUBJECTS[subj]]
+        r.append(('锚点第一级属该科领域枚举', not bad1,
+                  '非领域：' + ','.join(bad1[:3]) if bad1 else '%d条' % len(lv1)))
+        badn = [x for x in lv1 if x in CURR_NON_DOMAIN]
+        r.append(('锚点第一级非课标篇章名(禁总目标/教学建议)', not badn, ','.join(badn[:3])))
+
+    if subj in CURR_SUBJECTS:
+        # 课标书名须与"学科"字段同一门课（防"学科写绘画与手工、却引了别的课标"）
+        r.append(('课标书名与学科字段一致',
+                  bool(re.search(r'《培智学校义务教育%s课程标准（2016年版）》' % re.escape(subj), text)),
+                  subj))
+        # 别名命中须留对齐凭证。只在教案头＋课标锚点区检测，且排除"别名词本就是正式科目名
+        # 或领域名的子串"的情形（如"语文"⊂"生活语文"、"识字"⊂"识字与写字"），否则必然误报。
+        zone = sec_body(text, '教案头') + '\n' + asec
+        ali = sorted({a for a, s in CURR_ALIAS.items()
+                      if s == subj and a not in subj
+                      and not any(a in d for d in CURR_SUBJECTS[subj]) and a in zone})
+        if ali:
+            r.append(('别名命中须留对齐凭证(禁无声改写)', '对齐为' in zone, ','.join(ali[:4])))
+    elif subj:
+        r.append(('学科名须对齐为培智正式科目', '对齐为' in text,
+                  '%s→%s' % (subj, CURR_ALIAS.get(subj, '待人工确认'))))
+    if arch:
+        abook = [b for b in re.findall(r'《[^》]*?课程标准[^》]*?》', arch)]
+        r.append(('归档视图课标依据写明合法书名',
+                  bool(abook) and not [b for b in abook if b in bad_book],
+                  ','.join(abook[:2])))
 
     return name, r
 
@@ -1663,10 +1755,35 @@ def check_repo(root, ev):
     # 件数由本清单推导、断言名随 len 生成，避免后续新增细则时件数名与实不符
     ref_need = ('output-schema.json', 'format-baseline.md', 'release-checklist.md',
                 'domain-core.md', 'workflow.md', 'strategy-matrix.md', 'state-and-fallback.md',
-                'quickstart.md', 'glossary.md')
+                'quickstart.md', 'glossary.md', 'curriculum-standards.md')
     miss_ref = [f for f in ref_need if not os.path.exists(os.path.join(root, 'references', f))]
     r.append(('references/ 细则层%d件齐全' % len(ref_need), not miss_ref,
               '缺' + ','.join(miss_ref) if miss_ref else ''))
+
+    # ③ 3.16.0 课标口径**双向守恒**：引擎内 CURR_SUBJECTS/CURR_ALIAS ↔ 细则 curriculum-standards.md。
+    #    只验"代码里有"不够：细则补了科目而代码没补（或代码放宽领域而细则没写）会让
+    #    "美术→绘画与手工"这类对齐在某一侧静默失效，且两边都不会报错——正是"虚假的绿"的土壤。
+    #    故用守恒而非枚举：细则表里写进去的科目，代码表里必须一个不少地出来，反之亦然。
+    cs_path = os.path.join(root, 'references', 'curriculum-standards.md')
+    if os.path.exists(cs_path):
+        cs = open(cs_path, encoding='utf-8').read()
+        in_code = set(CURR_SUBJECTS)
+        # ⚠ 必须验"**科目一览表里的行**"，不能验"名字在文件里出现过"——
+        #   后者会被别名映射表、示范段、禁引清单里的同名词兜住：把科目从一览表删掉，
+        #   断言照样全绿（3.16.0 自己的 M13 当场复现，属"被别处同名词兜住"的老毛病）。
+        doc_subs = re.findall(r'\|\s*\d+\s*\|\s*([^|]+?)\s*\|\s*(?:一般性|选择性)\s*\|', cs)
+        lack = sorted(in_code - set(doc_subs))
+        r.append(('课标索引科目表≡引擎科目表(代码→细则)', not lack,
+                  '缺' + ','.join(lack) if lack else '%d门' % len(in_code)))
+        extra_d = sorted(set(doc_subs) - in_code)
+        r.append(('课标索引未多出引擎外的科目(细则→代码)',
+                  bool(doc_subs) and not extra_d,
+                  '多' + ','.join(extra_d[:4]) if extra_d else '%d门' % len(doc_subs)))
+        lackd = sorted({d for ds in CURR_SUBJECTS.values() for d in ds if d not in cs})
+        r.append(('课标索引含各门一级领域枚举', not lackd,
+                  '缺' + ','.join(lackd[:4]) if lackd else ''))
+        badmap = sorted({a for a, s in CURR_ALIAS.items() if s not in CURR_SUBJECTS})
+        r.append(('别名映射目标均属培智10门课', not badmap, ','.join(badmap[:4])))
     # ②-b 元断言：回归脚本自身禁止再写 "标题符 + .* + 关键词 + lookahead" 的取段正则。
     # 3.13.0 实测惨案：`^### .*感官调节.*?(?=^## |…)` 在 re.S 下 . 跨行 → 从文档首个 ###
     # 起一路吞到关键词首次出现处，sn_sec 占全文 66%、ie_sec 占 97%（22831 字符），
