@@ -27,7 +27,7 @@ import sys
 import subprocess
 import tempfile
 
-ENGINE_VERSION = '3.17.0'   # 与 SKILL.md frontmatter 同源，回归自动校验（第 9 处）
+ENGINE_VERSION = '3.18.0'   # 与 SKILL.md frontmatter 同源，回归自动校验（第 9 处）
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = sys.executable
@@ -383,6 +383,34 @@ def main():
         'M15 复活已废止的「教务归档视图」（防半截改名残留）',
         '3.17.0 已废止该节；若样例里偷偷复活，元断言必须当场变红而不是静默放行',
         m15, '在效条文无"教务归档'))
+
+    # ── M16 课题列回到"《课题》（册次·单元·课次）"（3.18.0 前的重合写法）────
+    # 最典型的退化：写课题顺手把册次带上。两列各写一遍册次＝两份须人工同步的副本。
+    def m16():
+        t = read(SAMPLE).decode('utf-8')
+        m = re.search(r'\|\s*课题\s*\|\s*([^|]+?)\s*\|', t)
+        assert m, '未定位到课题行'
+        write(SAMPLE, t.replace(
+            m.group(0), '| 课题 | 《好吃的水果》（人教版培智《生活语文》二年级上册·第二单元“个人生活”·第4课） |').encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M16 课题列带册次括号后缀（与教材版本列重合）',
+        '同一册次写两遍＝两份副本，改一处漏一处；教务核对时两处不一致无从判断谁对',
+        m16, '教案信息课题列只写《课题》本身'))
+
+    # ── M17 教材版本只写册次、单元课次被课题列"代写"而丢失 ─────────────────
+    # 合并字段时最常见的漏：只删了课题列的括号，忘了把单元课次补进教材版本列。
+    def m17():
+        t = read(SAMPLE).decode('utf-8')
+        m = re.search(r'\|\s*教材版本\s*\|\s*([^|]+?)\s*\|', t)
+        assert m, '未定位到教材版本行'
+        write(SAMPLE, t.replace(
+            m.group(0), '| 教材版本 | 人民教育出版社《生活语文》二年级上册（培智学校义务教育实验教科书），已核证 |').encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M17 教材版本列漏掉单元与课次（合并时只删未补）',
+        '单元课次是本课定位的正式信息，删了课题列括号却不补进教材版本＝信息丢失',
+        m17, '教案信息教材版本含册次与单元课次'))
 
     total, caught = len(results), sum(1 for x in results if x)
     log('=' * 64)

@@ -542,6 +542,21 @@ def check(path):
               bool(_atext) and not re.search(r'^《[^》]+》\s*(低|中|高年级段|第[一二三]学段|水平[一二三])?\s*[（(]?\s*详见',
                                              _atext)))
 
+    # 10b 课题／教材版本分工（3.18.0）：课题列只写《课题》本身，册次·单元·课次归入教材版本
+    # 背景：改前两列各写一遍"人教版培智《生活数学》一年级下册"，同一事实两处副本，
+    # 改一处漏一处且冲突时无从判断谁对（与 3.17.0 删归档视图同一病根：重复即同步成本）。
+    _trow = re.search(r'\|\s*课题\s*\|\s*([^|]+?)\s*\|', info_sec)
+    _tval = _trow.group(1) if _trow else ''
+    _tbad = bool(_tval) and bool(re.search(r'》\s*[（(]', _tval) or '年级' in _tval)
+    r.append(('教案信息课题列只写《课题》本身(禁带册次括号后缀)',
+              bool(_tval) and not _tbad, _tval[:40] if _tbad else ''))
+    _brow = re.search(r'\|\s*教材版本\s*\|\s*([^|]+?)\s*\|', info_sec)
+    _bval = _brow.group(1) if _brow else ''
+    r.append(('教案信息教材版本含册次与单元课次',
+              bool(_bval) and bool(re.search(r'(上|下)册', _bval))
+              and bool(re.search(r'单元|第\s*\d+\s*课', _bval)),
+              _bval[:40] if _bval else '缺教材版本行'))
+
     # 11 表号连续
     nums = [int(x) for x in re.findall(r'\*\*表(\d+)', text)]
     r.append(('表号连续无跳号', nums == list(range(1, len(nums) + 1)), str(nums)))
