@@ -16,7 +16,7 @@ import sys
 import glob
 import tempfile
 
-ENGINE_VERSION = '3.19.0'
+ENGINE_VERSION = '3.20.0'
 
 REPORT_DIR = os.path.join(tempfile.gettempdir(), 'peizhi_shuangmai')
 

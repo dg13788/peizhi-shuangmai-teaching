@@ -27,7 +27,7 @@ import sys
 import subprocess
 import tempfile
 
-ENGINE_VERSION = '3.19.0'   # 与 SKILL.md frontmatter 同源，回归自动校验（3.19.0 起版本位由九处减为八处）
+ENGINE_VERSION = '3.20.0'   # 与 SKILL.md frontmatter 同源，回归自动校验（3.19.0 起版本位由九处减为八处）
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = sys.executable
@@ -39,13 +39,16 @@ MD_JSON = os.path.join(ROOT, 'scripts', 'md_to_json.py')
 MD_DOCX = os.path.join(ROOT, 'scripts', 'md_to_docx.py')
 REG = os.path.join(ROOT, 'scripts', 'regression_check.py')
 SAMPLE = os.path.join(ROOT, 'examples', '好吃的水果_教学设计方案_3课时.md')
+# 3.20.0：第二份基准样例此前**不在备份/还原集里**——变异只敢改好吃的水果，
+# 认识5 一侧的缺陷无法用变异验证（"两份基准只验一份"＝第四种虚假的绿的温床）。
+SAMPLE2 = os.path.join(ROOT, 'examples', '认识5_教学设计方案_2课时.md')
 JSON1 = os.path.join(ROOT, 'examples', '好吃的水果_结构化输出样例.json')
 JSON2 = os.path.join(ROOT, 'examples', '认识5_结构化输出样例.json')
 
 # 所有可能被变异写坏的文件，一律纳入备份/还原集
 CS = os.path.join(ROOT, 'references', 'curriculum-standards.md')
 
-FILES = [SKILL, MD_JSON, MD_DOCX, REG, SAMPLE, JSON1, JSON2, CS]
+FILES = [SKILL, MD_JSON, MD_DOCX, REG, SAMPLE, SAMPLE2, JSON1, JSON2, CS]
 
 out = []
 
@@ -391,6 +394,96 @@ def main():
         'M17 教材版本列漏掉单元与课次（合并时只删未补）',
         '单元课次是本课定位的正式信息，删了课题列括号却不补进教材版本＝信息丢失',
         m17, '教案信息教材版本含册次与单元课次'))
+
+    # ── M18 感官表删掉"未使用"的嗅觉行（3.20.0 前的"不必硬凑"口径）────────
+    # 变异刻意打在**不用"闻"的认识5**上：旧口径下"未用到的维度不必硬凑"，
+    # 删行完全合法、旧断言「用闻则含嗅觉」根本不会触发——这正是旧口径的漏洞本身。
+    def m18():
+        t = read(SAMPLE2).decode('utf-8')
+        lines = t.split('\n')
+        keep = [l for l in lines if not l.startswith('| 嗅觉')]
+        assert len(keep) == len(lines) - 1, '未定位到嗅觉行'
+        write(SAMPLE2, '\n'.join(keep).encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M18 感官表删掉"本课未使用"的嗅觉行（六维恒列）',
+        '删行后教师无从判断是"本课不需要"还是"漏了"；且触发源来自环境气味，不只来自教学环节',
+        m18, '感官六维恒列齐全'))
+
+    # ── M19 LOS 表起始列预填（证据归属越位）────────────────────────────
+    def m19():
+        t = read(SAMPLE).decode('utf-8')
+        m = re.search(r'(### LOS 变化记录表\n)(.*?)(?=\n### |\Z)', t, re.S)
+        assert m, '未定位到 LOS 表'
+        body = m.group(2)
+        nb = []
+        for ln in body.split('\n'):
+            if ln.startswith('| 生'):
+                cs = ln.strip().strip('|').split('|')
+                for i in range(1, len(cs) - 1, 2):
+                    cs[i] = ' I '
+                ln = '| ' + ' | '.join(c.strip() for c in cs) + ' |'
+            nb.append(ln)
+        write(SAMPLE, (t[:m.start(2)] + '\n'.join(nb) + t[m.end(2):]).encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M19 LOS 表起始列预填预设档',
+        '起始 LOS 由 P前 前测实测确定；预填＝教师照抄预设、前测沦为走过场（证据归属越位）',
+        m19, 'LOS表起始列禁预填'))
+
+    # ── M20 分层系数不按三档定档（自取"上限"）──────────────────────────
+    # 只改系数取值、不动测算式，专测定档断言是否被架空。
+    def m20():
+        t = read(SAMPLE).decode('utf-8')
+        m = re.search(r'\|\s*分层系数\s*\|\s*([^|]+?)\s*\|', t)
+        assert m, '未定位到分层系数行'
+        write(SAMPLE, t.replace(
+            m.group(0), '| 分层系数 | 1.3（C层占比 4/12＝33.3%，取上限） |').encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M20 分层系数不按C层占比三档定档（自取上限）',
+        '原条文只给上限触发条件、中档无据可依；不定档则测算值可被随意调高调低，出口判定随之摇摆',
+        m20, '分层系数按C层占比三档定档'))
+
+    # ── M21 家校反馈删掉"家庭可用的行为一致性做法" ─────────────────────
+    def m21():
+        t = read(SAMPLE).decode('utf-8')
+        i = t.find('**家校一致的一件小事**')
+        assert i > 0, '未定位到一致性做法段'
+        j = t.find('\n\n', i)
+        write(SAMPLE, (t[:i] + t[j + 2:]).encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M21 家校反馈删掉家庭可用的行为一致性做法',
+        'workflow 硬性要求附 1 条；缺失则家校两张皮，课堂上的替代行为在家得不到延续',
+        m21, '家校反馈附1条家庭可用的行为一致性做法'))
+
+    # ── M22 课标索引**自己的示范表**锚点退回"只写学段＋详见…节" ──────────
+    # M14 只守住 examples/，守不住 references/ 的示范——3.20.0 前此处正是退化写法。
+    def m22():
+        t = read(CS).decode('utf-8')
+        m = re.search(r'\|\s*课标锚点\s*\|\s*([^|]+?)\s*\|', t)
+        assert m, '未定位到示范表课标锚点行'
+        write(CS, t.replace(
+            m.group(0),
+            '| 课标锚点 | 《培智学校义务教育绘画与手工课程标准（2016年版）》第一学段（1~3年级）（详见「课标锚点、教材分析与学情分析」节） |').encode('utf-8'))
+    results.append(run_case(
+        'M22 课标索引示范表锚点退化为只写学段+详见（校验盲区）',
+        '示范件违反自己声明的规则比没有示范更坏——引擎与教师都照抄它，而校验只扫交付样例',
+        m22, '课标索引示范表锚点须三级全文'))
+
+    # ── M23 课时时间轴只给时间、不给 LOS 分组任务 ───────────────────────
+    def m23():
+        t = read(SAMPLE).decode('utf-8')
+        i = t.find('**各段 LOS 分组任务**')
+        assert i > 0, '未定位到 LOS 分组任务段'
+        j = t.find('\n\n', i)
+        write(SAMPLE, (t[:i] + t[j + 2:]).encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M23 课时时间轴缺 LOS 分组任务',
+        'workflow 环节 4 要求时间轴分段标注时间／活动（含步别）／LOS 分组任务；缺 LOS 则助教无从按段切换支持',
+        m23, '课时时间轴含时间＋步别＋LOS分组任务'))
 
     total, caught = len(results), sum(1 for x in results if x)
     log('=' * 64)

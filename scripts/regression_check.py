@@ -65,6 +65,10 @@ def cells(row):
 # 唯一口径，避免两边各写一份短名/全名而出现"两边一致地错"的盲区。
 SENSORY_BASE = ['听觉', '视觉', '前庭', '口欲', '触觉']
 SENSORY_EXTRA = ['嗅觉']
+# 3.20.0：六维恒列——六条一律成行，未使用的通道写明"本课未主动使用"，禁整行删掉。
+# 原口径是"五维必载＋嗅觉条件必载"，与 domain-core §4「六维度须前置评估」自相矛盾，
+# 且两份基准样例一个 5 行一个 6 行，教师无从判断是"本课不需要"还是"漏了"。
+SENSORY_ALL = SENSORY_BASE + SENSORY_EXTRA
 
 
 def sec_body(text, key):
@@ -604,6 +608,28 @@ def check(path):
     r.append(('附表内含 LOS 变化记录表与 IEP 累计追踪表',
               '起始LOS' in appx_text and '年度长期目标' in appx_text))
     r.append(('正文保留起始LOS预设速查(课上动线不断)', '起始LOS预设速查' in body_text))
+    # 3.20.0：起始 LOS 禁预填。起始档由「P前 前测」当堂实测确定（glossary BOPPPS 表／
+    # domain-core 环节 4），预填等于让教师照抄预设值、前测沦为走过场——
+    # 这与 MEMORY「内部自相矛盾黑名单④证据归属越位」同源，且在两份基准样例里同时存在：
+    # 表13/表15 起始列填了 I/G/P/F，而五列表 P前 行却写着"当堂记入表X起始列"，两者打架。
+    _los_tbl = next((b for b in bs if b and cells(b[0]) and cells(b[0])[0].strip() == '学生'
+                     and any('起始' in c for c in cells(b[0]))), None)
+    if _los_tbl is not None:
+        _hd = cells(_los_tbl[0])
+        _st = [i for i, c in enumerate(_hd) if '起始' in c]
+        _pre = []
+        for _rw in _los_tbl[1:]:
+            if is_sep(_rw) or not cells(_rw):
+                continue
+            _cs = cells(_rw)
+            for _i in _st:
+                if _i < len(_cs) and _cs[_i].strip():
+                    _pre.append('%s·%s' % (_cs[0].strip(), _hd[_i].strip()))
+                    break
+        r.append(('LOS表起始列禁预填(起始以前测实测为准)', not _pre,
+                  '' if not _pre else '预填%d行:%s' % (len(_pre), ','.join(_pre[:3]))))
+    else:
+        r.append(('LOS表起始列禁预填(起始以前测实测为准)', False, '未找到起始列表'))
     r.append(('IEP 累计口径随表进附表', '累计口径' in appx_text))
     # 否定式：禁"附表N"第二套编号——两套体系会让"表号＝出现顺序"失效，教务核对必乱
     r.append(('表号单一体系(禁"附表N"第二套编号)',
@@ -612,6 +638,67 @@ def check(path):
 
     # 13 占位符保留
     r.append(('占位符{{}}保留', '{{}}' in text))
+
+    # ===== 3.20.0 补盲区：主干产出与细则硬要求的兜底 =====
+    # 起因：逐条比对 workflow.md 的硬要求与断言清单，发现多条"细则写了、无人拦截"——
+    # 三视图（环节 3 硬产出）竟然没有任何断言；生活泛化三场景、AAC、家校一致性做法
+    # 同样在盲区里。凡细则写了"须/禁"而断言没跟上的，等于该条文对交付没有约束力。
+
+    # ① 三视图（教师一页速览／教师全量＝全文／家校反馈）
+    r.append(('三视图·教师一页速览节存在', '教师一页速览' in text))
+    _hf_sec = sec_body(text, '家校反馈')
+    r.append(('三视图·家校反馈节存在', bool(_hf_sec)))
+    r.append(('家校反馈附1条家庭可用的行为一致性做法',
+              bool(_hf_sec) and any(k in _hf_sec for k in
+                                    ('家校一致', '同一句', '同一张', '一致性做法')),
+              '' if _hf_sec else '缺家校反馈节'))
+    # ② 生活泛化（家庭/学校/社区各≥1条）
+    _gen_sec = sec_body(text, '生活泛化')
+    _miss_g = [k for k in ('家庭', '学校', '社区') if k not in _gen_sec]
+    r.append(('生活泛化含家庭／学校／社区三类', not _miss_g,
+              '' if not _miss_g else '缺' + ','.join(_miss_g)))
+    # ③ AAC 沟通支持（须有个别化条目，禁默认人人会口说）
+    _aac_sec = sec_body(text, 'AAC')
+    r.append(('AAC沟通支持节存在且有个别化条目',
+              bool(_aac_sec) and bool(re.search(r'生\d+', _aac_sec)),
+              '' if _aac_sec else '缺AAC节'))
+    # ④ 课时时间轴须同时给"时间/步别/LOS 分组任务"（workflow 环节 4）
+    _tl = sec_body(text, '课时时间轴')
+    r.append(('课时时间轴含时间＋步别＋LOS分组任务',
+              bool(_tl) and bool(re.search(r'\d+\s*至\s*\d+\s*分钟', _tl))
+              and bool(re.search(r'（?[BOPP前参后S][导入目标测验总结]*）?', _tl)) and 'LOS' in _tl,
+              '' if _tl else '缺课时时间轴节'))
+    # ⑤ 支持调整阈值「无进展」项须回查策略路由矩阵（4×3）重新装配——
+    #   只回查本课时「支持策略」列是同一批做法的复查，换不出新装配。
+    _card_sec = sec_body(text, '跨课时行为干预支持卡')
+    _np = [rw for rw in _card_sec.split('\n')
+           if rw.strip().startswith('|') and '无进展' in rw]
+    if _np:
+        _ok_mx = any(k in _np[0] for k in ('策略路由矩阵', '4×3', '知识类型×学科属性'))
+        r.append(('阈值表无进展项回查策略路由矩阵(非只查支持策略列)', _ok_mx,
+                  '' if _ok_mx else '仅回查本课时支持策略列'))
+    # ⑥ 分层系数三档定档（domain-core 课时量研判）：C 层占比 → 1.3／1.2／1.1，
+    #    禁由研判者自取"中上限"这类档位表内不存在的值。
+    #    取值必须锚定到「教案信息·班级」行，不能全文搜第一个"N人"——那会被学情分析、
+    #    分层建档表里的同形数字兜住（MEMORY：「被别处同名词兜住」已复发三次）。
+    #    取不到即 FAIL：班级行写总人数与 A/B/C 人数是输入契约，静默跳过＝条件断言空转。
+    _ju_sec = sec_body(text, '课时量研判')
+    _m_cf = re.search(r'\|\s*分层系数\s*\|\s*([\d.]+)', _ju_sec)
+    _cls_row = next((rw for rw in re.findall(r'^\|\s*班级\s*\|.*$', text, re.M)), '')
+    _m_tot = re.search(r'(\d+)\s*人', _cls_row)
+    _m_c = re.search(r'C组\s*(\d+)\s*人', _cls_row)
+    if not _m_cf:
+        r.append(('分层系数按C层占比三档定档', False, '研判表缺分层系数行'))
+    elif not (_m_tot and _m_c):
+        r.append(('分层系数按C层占比三档定档', False,
+                  '班级行缺总人数或C组人数（无法定档）:%s' % _cls_row[:40]))
+    else:
+        _cf = float(_m_cf.group(1))
+        _ratio = int(_m_c.group(1)) / int(_m_tot.group(1))
+        _exp = 1.3 if _ratio >= 0.5 else (1.2 if _ratio >= 1.0 / 3 else 1.1)
+        r.append(('分层系数按C层占比三档定档', abs(_cf - _exp) < 1e-6,
+                  'C层%d/%d=%.1f%% 应取%.1f 实取%.1f'
+                  % (int(_m_c.group(1)), int(_m_tot.group(1)), _ratio * 100, _exp, _cf)))
 
     # 14 红区扫描
     hits = []
@@ -650,17 +737,18 @@ def check(path):
     # 感官六维（domain-core §4；3.13.0 从"五维"纠正为"六维"——
     # 此前本表停在五维、md_to_json 的 SENSORY_MAP 也停在五维，两边"一致地错了"，
     # 于是"少一条"反而满足下游硬相等断言，缺陷被自己的校验保护起来）。
-    # 必载五维是下限；用到哪个通道就须有哪行，故嗅觉为条件必载。
+    # 3.20.0：六维恒列——六条一律成行，用到即写实、未用则注明"本课未主动使用"；
+    # 旧口径"五维必载＋嗅觉条件必载"已废止（与 domain-core §4「六维度须前置评估」自相矛盾）。
     # 注意 detail 一律只在失败时给原因——PASS 时若吐"缺…"会被误读为未通过。
-    dims = SENSORY_BASE
+    dims = SENSORY_ALL
     miss_d = [d for d in dims if d not in sn_sec]
-    r.append(('感官必载五维齐全', not miss_d, '' if not miss_d else '缺' + ','.join(miss_d)))
+    r.append(('感官六维恒列齐全(3.20.0)', not miss_d, '' if not miss_d else '缺' + ','.join(miss_d)))
     sn_tbl = [b for b in bs if b and cells(b[0]) and cells(b[0])[0] == '感官/环境维度']
     sn_rows = [cells(rw)[0].strip() for b in sn_tbl
                for rw in b[1:] if cells(rw) and cells(rw)[0].strip()
                and not is_sep(rw)]
     # 行数守恒是防"派生静默丢行"的第一道闸：md 有几行，JSON 就必须有几条
-    r.append(('感官表行数≥必载五维', len(sn_rows) >= len(dims),
+    r.append(('感官表行数≥六维(恒列守恒)', len(sn_rows) >= len(dims),
               '' if len(sn_rows) >= len(dims) else '实%d行<%d' % (len(sn_rows), len(dims))))
     r.append(('感官调节章节存在', bool(sn_sec)))
     r.append(('感官调节表四列(维度/触发/前置/降刺激通道)',
@@ -859,14 +947,16 @@ def check_schema(root, ev=''):
     r.append(('Schema 感官调节四字段', set(sd) == {'维度', '触发信号', '前置安排', '降刺激通道'}, str(sd)))
     sdim_enum = sensory.get('items', {}).get('properties', {}).get('维度', {}).get('enum', [])
     # 3.13.0：原为 enum == 五维 的硬相等，导致给 enum 补一个合法维度（嗅觉）就会被判违规。
-    # 感官是六维（domain-core §4），必载五维是下限而非全集，故改为"必载⊆enum"。
-    base_enum = {'听觉', '视觉', '前庭与座位', '口欲与过敏', '触觉与材料'}
-    r.append(('Schema 感官维度枚举含必载五维',
-              sensory.get('minItems') == 5 and base_enum <= set(sdim_enum),
+    # 感官是六维（domain-core §4），故改为"必载⊆enum"。
+    # 3.20.0：六维恒列——必载由五维升为六维，`minItems` 由 5 升为 6（否则 Schema 自己
+    # 声明"至少 5 条"，与"六条一律成行"的契约冲突：一份只有 5 条的合法 JSON 会误导下游）。
+    base_enum = {'听觉', '视觉', '前庭与座位', '口欲与过敏', '触觉与材料', '嗅觉'}
+    r.append(('Schema 感官维度枚举含六维',
+              sensory.get('minItems') == 6 and base_enum <= set(sdim_enum),
               '' if base_enum <= set(sdim_enum) else 'enum=%s' % sdim_enum))
-    r.append(('Schema 感官枚举含嗅觉(六维贯通)',
-              '嗅觉' in set(sdim_enum),
-              '' if '嗅觉' in set(sdim_enum) else 'enum 停在五维——与 domain-core §4 六维不一致'))
+    r.append(('Schema 感官 minItems=6(六维恒列)',
+              sensory.get('minItems') == 6,
+              '' if sensory.get('minItems') == 6 else 'minItems=%s' % sensory.get('minItems')))
     idf = iep.get('items', {}).get('required', [])
     r.append(('Schema IEP 追踪五字段',
               set(idf) == {'学生代号', '年度长期目标', '本课短期目标', '分课时达成', '累计口径'}, str(idf)))
@@ -1035,9 +1125,10 @@ def check_schema(root, ev=''):
         # 缺陷被自己的校验保护起来（反向变异已证：删掉嗅觉条目照样全绿）。
         # 改为"必载⊆实际"＋"条数≡源稿行数"，两条交叉才锁得住。
         sdims = [x['维度'] for x in data.get('sensory_regulation', [])]
-        base_full = {'听觉', '视觉', '前庭与座位', '口欲与过敏', '触觉与材料'}
+        # 3.20.0：六维恒列——必载集合由五维升为六维（含嗅觉），与 md 侧 SENSORY_ALL 同源
+        base_full = {'听觉', '视觉', '前庭与座位', '口欲与过敏', '触觉与材料', '嗅觉'}
         miss_sd = sorted(base_full - set(sdims))
-        rr.append((tag + ' JSON 感官必载五维齐全', not miss_sd, '' if not miss_sd else '缺' + ','.join(miss_sd)))
+        rr.append((tag + ' JSON 感官六维恒列齐全', not miss_sd, '' if not miss_sd else '缺' + ','.join(miss_sd)))
         rr.append((tag + ' JSON 感官维度全部在枚举内(含嗅觉)',
                   set(sdims) <= (base_full | set(SENSORY_EXTRA)),
                   '' if set(sdims) <= (base_full | set(SENSORY_EXTRA)) else '越界:' + ','.join(sorted(set(sdims) - base_full - set(SENSORY_EXTRA)))))
@@ -1811,6 +1902,35 @@ def check_repo(root, ev):
                   '缺' + ','.join(lackd[:4]) if lackd else ''))
         badmap = sorted({a for a, s in CURR_ALIAS.items() if s not in CURR_SUBJECTS})
         r.append(('别名映射目标均属培智10门课', not badmap, ','.join(badmap[:4])))
+        # ③-c 3.20.0：课标索引**自己的示范表**同样受三级锚点约束。
+        #   3.16.0 立了"禁只写学段＋禁以'详见……节'代替"，并用变异 M14 守住 examples/，
+        #   却没守住 references/ 里的示范——curriculum-standards.md 第六节的示范表长期写着
+        #   "第一学段（1~3年级）（详见……节）"，正是 M14 要拦的退化写法。
+        #   **示范件违反自己声明的规则，比没有示范更坏**：引擎与教师都会照抄它，
+        #   而校验只扫交付样例、不扫示范，缺陷长期在盲区里。
+        _csd = os.path.join(root, 'references', 'curriculum-standards.md')
+        if os.path.exists(_csd):
+            _dst = open(_csd, encoding='utf-8').read().replace('\r\n', '\n')
+            _dem = re.findall(r'^\|\s*课标锚点\s*\|\s*(.+?)\s*\|$', _dst, re.M)
+            _bad_dem = [x for x in _dem if x.count('·') < 3]
+            r.append(('课标索引示范表锚点须三级全文', bool(_dem) and not _bad_dem,
+                      ('退化%d行:%s' % (len(_bad_dem), _bad_dem[0][:40])) if _bad_dem
+                      else '%d行' % len(_dem)))
+            # 示范节（## 六、示范）内出现别名原词时，学科行必须留"对齐为"凭证
+            _in6, _blk6 = False, []
+            for _l in _dst.split('\n'):
+                if re.match(r'^##\s', _l):
+                    _in6 = '示范' in _l
+                if _in6:
+                    _blk6.append(_l)
+            _blk6 = '\n'.join(_blk6)
+            _subs6 = re.findall(r'^\|\s*学科\s*\|\s*(.+?)\s*\|$', _blk6, re.M)
+            _alias_hit = [a for a in CURR_ALIAS if a in _blk6]
+            _no_vou = [x for x in _subs6 if _alias_hit and '对齐为' not in x]
+            r.append(('课标索引示范表别名须留对齐凭证',
+                      bool(_subs6) and not _no_vou,
+                      ('无凭证:%s' % _no_vou[0][:40]) if _no_vou
+                      else ('别名%s' % ','.join(_alias_hit[:2]) if _alias_hit else '无别名示范')))
     # ③-b 3.17.0 元断言：教务归档视图已废止，全库在效条文不得再出现"教务归档""四视图"。
     #    改名/删节最容易留下半截改名——细则说三视图、样例里却还留着归档节，
     #    届时引擎照旧产出一节没人维护的孤儿内容，而没有任何断言会报错。

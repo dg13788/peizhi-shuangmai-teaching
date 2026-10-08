@@ -1,19 +1,19 @@
 ---
 name: peizhi-shuangmai-teaching
 description: 面向培智学校（及同类个别化教学）各学科的备课与教学设计 Skill。触发词：备课 / 教案 / 教学设计 / IEP 个别化教育计划 / 上传教材照片备课 / 趣味化教学方案 / BOPPPS 教案。以「个别化×生活化」双脉为主干、BOPPPS 为组织骨架、趣味化参与式学习为核心，支持 1~N 课时单元课设计，产出可测、可 LOS 六级分层、可迁移到真实生活的教学方案，经内置脚本一键交付 Word 成品；内置红区隐私护栏、双 Gate 低打扰确认、六维感官调节前置、跨课时行为干预递进、IEP 长期目标累计追踪与 4×3 知识类型策略路由。
-version: 3.19.0
+version: 3.20.0
 display_name: 培智·双脉教学引擎（特教 IEP 备课 Skill）
 display_name_en: Peizhi Dual-Track Teaching Engine
 description_zh: "面向培智学校的 IEP 备课 Skill：以「个别化×生活化」双脉为主干、BOPPPS 为骨架，支持 1~N 课时单元设计，产出 LOS 六级分层可测方案，一键交付 Word 成品。"
 description_en: "Lesson-planning skill for Peizhi (intellectual-disability) schools and similar individualized settings. Triggers: lesson prep / teaching plan / instructional design / IEP / lesson from textbook photos / gamified lesson / BOPPPS. Individualization x life-relevance dual track, BOPPPS skeleton, playful participatory learning, 1-to-N lesson units, LOS six-level tiered measurable plans, Word delivery via built-in scripts, red-zone privacy guardrails, cross-lesson PBS progression, IEP cumulative tracking."
-license: MIT＋红区护栏不可移除附加条款（全文见 LICENSE；上传包内为 references/LICENSE.md）
+license: MIT＋红区护栏不可移除附加条款（全文见 LICENSE）
 compatibility: 豆包 / 千问 / DeepSeek / Kimi / ChatGPT / WorkBuddy 等支持长提示词与附件上传的 AI 平台；Word 成品交付需文件系统环境，纯对话环境自动回退三视图文本交付
 metadata:
   author: Xd_香墩
   tags: 培智,特教,IEP,个别化教育,教学设计,备课,分层教学,LOS,AAC,PBS,BOPPPS,趣味化教学
 ---
 
-# 培智 · 双脉教学引擎 V3.19.0
+# 培智 · 双脉教学引擎 V3.20.0
 
 > **三层渐进式披露**：本文件＝**路由层**（常驻，只讲"走哪步、守什么、去哪取"）；
 > `references/`＝**细则层**（进入某环节时读对应文件）；`scripts/`＝**执行层**（格式转换一律调脚本，禁手工）。
@@ -88,5 +88,5 @@ metadata:
 - **交付形态＝仓库本身（单轨）**：治理文件（README/CHANGELOG/CONTRIBUTING/LICENSE）与执行层同库同源，用时直接以仓库目录取用；**3.19.0 起不再打包技能上传 zip、不再产出 `dist/`**（此前"仓库轨＋第三方技能平台上传轨"的双轨制已废止——打包产物是另一份需与仓库同步的副本，忘了重打即内容与仓库漂移）。
 - **结构化契约**：机器可读产物合 `references/output-schema.json`；顶层必填 `schema_version / meta / anchors[] / lessons[] / los_table / support / generalization / safety_alternatives / sensory_regulation / iep_tracking / materials / privacy`（回归自动校验）；硬约束：逐课时分钟合计＝单课时时长、`len(lessons) == 课时数N`、支持卡六要素、`los_table[].records` 逐课时成对、代号合 `^生\d+$`、`privacy.red_zone_free = true`、**`研判课时数N == 课时数N`**。
 - **Single Source**：JSON 只可由 md 经 `scripts/md_to_json.py` 派生，docx 只可由 `scripts/md_to_docx.py` 生成；样本见 `examples/好吃的水果_结构化输出样例.json`。
-- **版本一致性**：升版本须同步 SKILL.md frontmatter / 正文标题 / `references/output-schema.json` 的 `schema_version` const / 三脚本 `ENGINE_VERSION` / CHANGELOG 条目（回归自动校验）。
+- **版本一致性（八处）**：frontmatter `version`／正文标题 `Vx.y.z`／`output-schema.json` 的 `schema_version` const／`md_to_json.py`、`md_to_docx.py`、`mutation_check.py` 的 `ENGINE_VERSION`／CHANGELOG 当前条目／README 标题与版本段——回归自动校验，脚本版本以 frontmatter 为唯一真源。
 - 版本规则与历史见 `CHANGELOG.md`；贡献边界见 `CONTRIBUTING.md`；发布清单见 `references/release-checklist.md`；回归基准见 `examples/` 下两份基准教案。
