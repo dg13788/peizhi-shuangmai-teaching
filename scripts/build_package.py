@@ -32,7 +32,7 @@ import zipfile
 import tempfile
 import hashlib
 
-ENGINE_VERSION = '3.16.0'
+ENGINE_VERSION = '3.17.0'
 ZIP_STAMP = (2020, 1, 1, 0, 0, 0)   # 固定时间戳 → 字节幂等
 
 REPORT_DIR = os.path.join(tempfile.gettempdir(), 'peizhi_shuangmai')

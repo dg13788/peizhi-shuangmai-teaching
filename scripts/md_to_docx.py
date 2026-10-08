@@ -45,7 +45,7 @@ import hashlib
 import datetime
 import tempfile
 
-ENGINE_VERSION = '3.16.0'
+ENGINE_VERSION = '3.17.0'
 
 REPORT_DIR = os.path.join(tempfile.gettempdir(), 'peizhi_shuangmai')
 
@@ -635,7 +635,7 @@ def build_docx_bytes(text):
 
 # ---------- 派生文件名 ----------
 def plan_title(md_text):
-    """取教案头课题列作文档标题（去书名号与括号后缀）"""
+    """取教案信息课题列作文档标题（去书名号与括号后缀）"""
     m = re.search(r'^\|\s*课题\s*\|\s*(.+?)\s*\|', md_text, re.M)
     title = m.group(1) if m else '教学设计方案'
     t = re.match(r'^《(.+?)》', title)

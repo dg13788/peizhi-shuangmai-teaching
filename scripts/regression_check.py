@@ -526,10 +526,21 @@ def check(path):
         r.append(('板书按课时分块(禁一板通用)', _nblk >= n_less,
                   '%d块/%d课时' % (_nblk, n_less)))
 
-    # 10 教务归档视图含课标锚点三级（≥2 个“·”分隔）
-    arch = text.split('教务归档视图')[1] if '教务归档视图' in text else ''
-    anchor = re.search(r'课标依据\s*\|\s*([^|]+)', arch)
-    r.append(('归档视图含课标锚点三级', bool(anchor) and anchor.group(1).count('·') >= 2))
+    # 10 教案信息·课标锚点须写三级全文（3.17.0：教务归档视图删除后，教案信息成为唯一正式信息源）
+    # ⚠ 原写法是 `text.split('教务归档视图')[1]`——取"关键词之后的全部文本"，属固定窗口的变体：
+    #   节已删除时取到空串，该断言会静默消失而不是报错（第七种"虚假的绿"的雏形）。
+    #   改为按结构取段取「教案信息」节，并以"节是否存在"本身作为断言。
+    info_sec = sec_body(text, '教案信息')
+    r.append(('教案信息节存在(唯一正式信息源)', bool(info_sec.strip()),
+              '' if info_sec.strip() else '缺「教案信息」节'))
+    _arow = re.search(r'\|\s*课标锚点\s*\|\s*([^|]+?)\s*\|', info_sec)
+    _atext = _arow.group(1) if _arow else ''
+    r.append(('教案信息课标锚点三级全文', bool(_atext) and _atext.count('·') >= 2,
+              '锚点分隔%d个' % _atext.count('·') if _atext else '缺课标锚点行'))
+    # 禁退化：只写学段或以"详见……节"代替本行（3.17.0 前教案头正是这种残缺写法）
+    r.append(('教案信息课标锚点禁只写学段/禁详见代替',
+              bool(_atext) and not re.search(r'^《[^》]+》\s*(低|中|高年级段|第[一二三]学段|水平[一二三])?\s*[（(]?\s*详见',
+                                             _atext)))
 
     # 11 表号连续
     nums = [int(x) for x in re.findall(r'\*\*表(\d+)', text)]
@@ -741,7 +752,7 @@ def check(path):
     # ===== 3.16.0 新增：课标引用口径（只验格式不验真伪＝第六种"虚假的绿"）=====
     sm = re.search(r'\|\s*学科\s*\|\s*([^|]+?)\s*\|', text)
     subj = sm.group(1).strip() if sm else ''
-    r.append(('教案头学科属培智10门课', subj in CURR_SUBJECTS, subj or '未填学科'))
+    r.append(('教案信息学科属培智10门课', subj in CURR_SUBJECTS, subj or '未填学科'))
 
     # 书名白名单：正文出现的每部课标书名都须形如《培智学校义务教育{科目}课程标准（2016年版）》
     books = re.findall(r'《[^》]*?课程标准[^》]*?》', text)
@@ -777,9 +788,9 @@ def check(path):
         r.append(('课标书名与学科字段一致',
                   bool(re.search(r'《培智学校义务教育%s课程标准（2016年版）》' % re.escape(subj), text)),
                   subj))
-        # 别名命中须留对齐凭证。只在教案头＋课标锚点区检测，且排除"别名词本就是正式科目名
+        # 别名命中须留对齐凭证。只在教案信息＋课标锚点区检测，且排除"别名词本就是正式科目名
         # 或领域名的子串"的情形（如"语文"⊂"生活语文"、"识字"⊂"识字与写字"），否则必然误报。
-        zone = sec_body(text, '教案头') + '\n' + asec
+        zone = sec_body(text, '教案信息') + '\n' + asec
         ali = sorted({a for a, s in CURR_ALIAS.items()
                       if s == subj and a not in subj
                       and not any(a in d for d in CURR_SUBJECTS[subj]) and a in zone})
@@ -788,9 +799,9 @@ def check(path):
     elif subj:
         r.append(('学科名须对齐为培智正式科目', '对齐为' in text,
                   '%s→%s' % (subj, CURR_ALIAS.get(subj, '待人工确认'))))
-    if arch:
-        abook = [b for b in re.findall(r'《[^》]*?课程标准[^》]*?》', arch)]
-        r.append(('归档视图课标依据写明合法书名',
+    if info_sec:
+        abook = [b for b in re.findall(r'《[^》]*?课程标准[^》]*?》', info_sec)]
+        r.append(('教案信息课标锚点写明合法书名',
                   bool(abook) and not [b for b in abook if b in bad_book],
                   ','.join(abook[:2])))
 
@@ -1784,6 +1795,43 @@ def check_repo(root, ev):
                   '缺' + ','.join(lackd[:4]) if lackd else ''))
         badmap = sorted({a for a, s in CURR_ALIAS.items() if s not in CURR_SUBJECTS})
         r.append(('别名映射目标均属培智10门课', not badmap, ','.join(badmap[:4])))
+    # ③-b 3.17.0 元断言：教务归档视图已废止，全库在效条文不得再出现"教务归档""四视图"。
+    #    改名/删节最容易留下半截改名——细则说三视图、样例里却还留着归档节，
+    #    届时引擎照旧产出一节没人维护的孤儿内容，而没有任何断言会报错。
+    #    ⚠ 必须排除 CHANGELOG.md（历史条目保留原文）与 release-checklist.md（历史台账）；
+    #      否则改一次名就要去改写历史，历史反而失真。
+    _scan = ['SKILL.md', 'README.md', 'CONTRIBUTING.md']
+    _scan += ['references/' + f for f in ('workflow.md', 'domain-core.md', 'format-baseline.md',
+                                          'state-and-fallback.md', 'strategy-matrix.md',
+                                          'quickstart.md', 'glossary.md', 'curriculum-standards.md',
+                                          'output-schema.json')]
+    _scan += [os.path.join('examples', f) for f in os.listdir(os.path.join(root, 'examples'))
+              if f.endswith('.md')]
+    # 豁免：显式标注为历史/废止的说明行（"替代原「教务归档视图」""不再另出教务归档视图"）
+    # 仍须写明旧名，否则读者无从知道废止了什么；但"四视图"是对**当前**状态的描述，一律不豁免
+    # ——它一旦残留就会让引擎继续产出第四个视图，故必须彻底清零。
+    _legacy = ('废止', '已删', '3.17.0 前', '3.17.0起', '此前', '不再另出', '原「', '原教务')
+    _hits = []
+    for _p in _scan:
+        _fp = os.path.join(root, _p)
+        if not os.path.exists(_fp):
+            continue
+        _txt = open(_fp, encoding='utf-8').read()
+        for _k in ('教务归档', '四视图'):
+            for _line in _txt.split('\n'):
+                if _k not in _line:
+                    continue
+                # 历史台账行跳过：README 的"- 版本："段与 CHANGELOG 同性质，是各版本
+                # 变更流水账（如 3.7.0 条目原文就写"四视图同一数据源冲突"）。
+                # 改一次名就去改写历史，历史反而失真——故只管在效条文，不管台账。
+                if _line.lstrip().startswith('- 版本：'):
+                    continue
+                if _k == '教务归档' and any(w in _line for w in _legacy):
+                    continue      # 历史说明行，放行
+                _hits.append('%s:%s' % (_p, _k))
+                break
+    r.append(('在效条文无"教务归档/四视图"残留(3.17.0 废止)', not _hits,
+              '' if not _hits else ','.join(_hits[:4])))
     # ②-b 元断言：回归脚本自身禁止再写 "标题符 + .* + 关键词 + lookahead" 的取段正则。
     # 3.13.0 实测惨案：`^### .*感官调节.*?(?=^## |…)` 在 re.S 下 . 跨行 → 从文档首个 ###
     # 起一路吞到关键词首次出现处，sn_sec 占全文 66%、ie_sec 占 97%（22831 字符），

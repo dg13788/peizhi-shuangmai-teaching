@@ -19,11 +19,11 @@
     "privacy"
   ],
   "properties": {
-    "schema_version": { "type": "string", "const": "3.16.0" },
+    "schema_version": { "type": "string", "const": "3.17.0" },
 
     "meta": {
       "type": "object",
-      "title": "教案头",
+      "title": "教案信息",
       "required": ["课题", "学科", "学段年级", "班级", "课时数N", "单课时时长分钟", "课型"],
       "properties": {
         "课题": { "type": "string" },
@@ -96,7 +96,7 @@
     "anchors": {
       "type": "array",
       "title": "课标锚点三级（多锚点）",
-      "description": "一课常挂多个领域条目（如识字与写字／阅读／倾听与说话），故为数组。每条必须到「板块 · 条目 · 具体表述」三级，禁只写学段；四视图与结构化输出必须一致。",
+      "description": "一课常挂多个领域条目（如识字与写字／阅读／倾听与说话），故为数组。每条必须到「板块 · 条目 · 具体表述」三级，禁只写学段；三视图与结构化输出必须一致。",
       "minItems": 1,
       "items": {
         "type": "object",

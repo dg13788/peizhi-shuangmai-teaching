@@ -27,7 +27,7 @@ import sys
 import subprocess
 import tempfile
 
-ENGINE_VERSION = '3.16.0'   # 与 SKILL.md frontmatter 同源，回归自动校验（第 9 处）
+ENGINE_VERSION = '3.17.0'   # 与 SKILL.md frontmatter 同源，回归自动校验（第 9 处）
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = sys.executable
@@ -312,9 +312,9 @@ def main():
         write(SAMPLE, t.replace('| 学科 | 生活语文 |', '| 学科 | 美术 |').encode('utf-8'))
         rederive()
     results.append(run_case(
-        'M10 教案头学科写成别名"美术"且未留对齐凭证',
+        'M10 教案信息学科写成别名"美术"且未留对齐凭证',
         '学科名不落培智10门＝后续课标引用必然走偏；别名命中还须留"对齐为"凭证',
-        m10, '教案头学科属培智10门课'))
+        m10, '教案信息学科属培智10门课'))
 
     def m11():
         t = read(SAMPLE).decode('utf-8')
@@ -353,6 +353,36 @@ def main():
         'M13 课标索引漏记「绘画与手工」（口径双向守恒）',
         '细则少一门 ⇒ 该科错引再也拦不住，且两侧均静默——守恒断言必须当场变红',
         m13, '课标索引科目表'))
+
+    # ── M14 教案信息课标锚点退化为"只写学段＋详见…节"（3.17.0 前的旧写法）────
+    # 3.17.0 把正式信息源从被删的归档视图回并到教案信息，最典型的退化就是
+    # 又写成"第一学段（详见……节）"——三级全文重新落到别处、教务翻第一页只看到学段。
+    def m14():
+        t = read(SAMPLE).decode('utf-8')
+        m = re.search(r'\|\s*课标锚点\s*\|\s*([^|]+?)\s*\|', t)
+        assert m, '未定位到课标锚点行'
+        write(SAMPLE, t.replace(
+            m.group(0), '| 课标锚点 | 《培智学校义务教育生活语文课程标准（2016年版）》低年级段（详见「课标锚点、教材分析与学情分析」节） |').encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M14 教案信息课标锚点退化为只写学段+详见（3.17.0 前的残缺写法）',
+        '三级全文若退回"详见…节"，教务翻第一页只看得到学段——正式信息源等于又放错了位置',
+        m14, '教案信息课标锚点三级全文'))
+
+    # ── M15 复活已废止的「教务归档视图」（半截改名的典型残留）──────────────
+    # 改名/删节最怕留下半截：细则已改三视图，样例里却还留着归档节。
+    # 届时引擎照旧产出一节没人维护的孤儿内容，且无任何断言报错。
+    def m15():
+        t = read(SAMPLE).decode('utf-8')
+        assert '## 二、课标锚点' in t
+        write(SAMPLE, t.replace(
+            '## 二、课标锚点',
+            '## 二、教务归档视图（正式归档，不含假设与批注）\n\n占位。\n\n## 三、课标锚点', 1).encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M15 复活已废止的「教务归档视图」（防半截改名残留）',
+        '3.17.0 已废止该节；若样例里偷偷复活，元断言必须当场变红而不是静默放行',
+        m15, '在效条文无"教务归档'))
 
     total, caught = len(results), sum(1 for x in results if x)
     log('=' * 64)

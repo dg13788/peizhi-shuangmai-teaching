@@ -16,7 +16,7 @@ import sys
 import glob
 import tempfile
 
-ENGINE_VERSION = '3.16.0'
+ENGINE_VERSION = '3.17.0'
 
 REPORT_DIR = os.path.join(tempfile.gettempdir(), 'peizhi_shuangmai')
 
@@ -177,7 +177,9 @@ def derive(text):
     secs = split_sections(text)
 
     # ---- meta ----
-    head_sec = find_sec(secs, '教案头')
+    # 3.17.0：「教案头」更名「教案信息」。find_sec 是子串匹配，改名后若不同步，
+    # meta（课题/班级/时长/课时数）会被整体取空而不报错——这是改名类改动最典型的静默事故。
+    head_sec = find_sec(secs, '教案信息')
     meta_raw = {}
     if head_sec:
         tbl = table_blocks(head_sec[2])
