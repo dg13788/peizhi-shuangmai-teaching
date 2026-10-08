@@ -46,16 +46,16 @@ PR 合并前必须通过以下十一项（详见 `references/release-checklist.m
 - [ ] `python scripts/regression_check.py` 全项 PASS（通过率必须为 100%，项数以报告为准；
       报告写系统临时目录 `peizhi_shuangmai/regression_report.txt`；含引擎自身防漂移校验：
       frontmatter 合规、SemVer、版号多处一致、五条铁律表述、外部引用存在性；
-      含 md→JSON 派生一致性、Word 成品结构/版式/反篡改与双轨合规）
+      含 md→JSON 派生一致性、Word 成品结构/版式/反篡改与仓库合规）
 - [ ] 全库扫描无真实姓名/照片/病历（红区零输入）
 - [ ] **三层渐进式披露**：新增或改动 `references/` 细则后，已在 `SKILL.md` 顶部"读取索引"登记
       （回归"references/ 无孤儿文件"断言自动校验）；主文件体积 ≤12KB、行数 ≤150，
       **禁止把细则回流进主文件**
 - [ ] **细则层不丢链**：`SKILL.md` 引用的全部 `references/` / `scripts/` / `examples/` 路径均存在；
-      新增细则由打包器自动入包（无需改白名单），`dist/*.zip` 含全部细则层文件
+      新增细则即自动生效（无白名单、无入包环节——3.19.0 起仓库即交付形态）
 
-> 发布到技能平台前追加一步：`python scripts/build_package.py` 产出 `dist/*.zip`，
-> 按 `references/release-checklist.md` 双轨清单逐项核对（打包器已强制 frontmatter 必检＋入包红区扫描）。
+> 发布前按 `references/release-checklist.md` 逐项核对（回归已强制 frontmatter 必检、
+> 版本号一致、主文件体积/行数双封顶与全库红区扫描）。
 
 ## 4. 红区护栏红线（不可协商）
 

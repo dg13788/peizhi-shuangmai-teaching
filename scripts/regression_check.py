@@ -1770,12 +1770,13 @@ def check_delivery(root):
 
 
 def check_repo(root, ev):
-    """双轨合规与仓库卫生（2.5.0）：技能上传规范（豆包/千问/WorkBuddy）＋ GitHub 仓库规范
-    —— 仓库保留治理文件（GitHub 轨），上传 zip 由 scripts/build_package.py 从仓库产出（技能轨）"""
+    """仓库合规与卫生——3.19.0 起**单轨**：仓库即唯一交付形态，不再产出技能上传 zip
+    （打包器脚本与 dist/ 已删；此前所谓"双轨"指 GitHub 轨 ＋ 第三方技能平台上传轨）"""
     r = []
     # ① 技能标准布局（scripts/ + references/ + examples/）
-    r.append(('scripts/ 四脚本齐全(含打包器)', all(os.path.exists(os.path.join(root, 'scripts', f)) for f in
-              ('md_to_docx.py', 'md_to_json.py', 'regression_check.py', 'build_package.py'))))
+    # 3.19.0：打包轨废止后为三脚本（派生／生成／校验），变异脚本另行单独校验其入库。
+    r.append(('scripts/ 执行层三脚本齐全', all(os.path.exists(os.path.join(root, 'scripts', f)) for f in
+              ('md_to_docx.py', 'md_to_json.py', 'regression_check.py'))))
     # 2.6.0 三层渐进式披露：references/ 承载细则层，缺一即断链。
     # 3.11.0 增至九件（新增 quickstart.md 单人实施版、glossary.md 术语速查），
     # 件数由本清单推导、断言名随 len 生成，避免后续新增细则时件数名与实不符
@@ -1847,6 +1848,27 @@ def check_repo(root, ev):
                 break
     r.append(('在效条文无"教务归档/四视图"残留(3.17.0 废止)', not _hits,
               '' if not _hits else ','.join(_hits[:4])))
+    # ③-b 3.19.0 元断言：打包轨废止后，**现行**文档的"怎么交付／怎么发布"部分不得再出现
+    #    build_package 或 dist/ ——否则读者按文档执行会撞上一个不存在的脚本（死步骤）。
+    #    豁免同理：CHANGELOG.md（历史台账）；release-checklist.md 的 `### v` 之后＝历史执行
+    #    记录块，须保留原文，否则历史失真。现行清单区仍在 `### v` 之前。
+    #    另：写明"已删除/废止/不再产出"的说明行也放行——读者需知道取消了什么，
+    #    这与 3.17.0 放行"废止教务归档视图"的说明行是同一逻辑。
+    _pk = []
+    _drop = ('废止', '已删', '删除', '取消', '不再产出', '不再保留', '不再提供', '3.19.0')
+    for _p in _scan:
+        _fp = os.path.join(root, _p)
+        if not os.path.exists(_fp) or os.path.basename(_p) == 'CHANGELOG.md':
+            continue
+        _txt = open(_fp, encoding='utf-8').read()
+        if os.path.basename(_p) == 'release-checklist.md':
+            _txt = _txt.split('\n### v')[0]
+        for _k in ('build_package', 'dist/'):
+            for _line in _txt.split('\n'):
+                if _k in _line and not any(w in _line for w in _drop):
+                    _pk.append('%s:%s' % (_p, _k))
+                    break
+    r.append(('现行文档无已废止打包步骤残留(3.19.0)', not _pk, ','.join(_pk[:4])))
     # ②-b 元断言：回归脚本自身禁止再写 "标题符 + .* + 关键词 + lookahead" 的取段正则。
     # 3.13.0 实测惨案：`^### .*感官调节.*?(?=^## |…)` 在 re.S 下 . 跨行 → 从文档首个 ###
     # 起一路吞到关键词首次出现处，sn_sec 占全文 66%、ie_sec 占 97%（22831 字符），
@@ -1864,14 +1886,14 @@ def check_repo(root, ev):
     except Exception as e:
         r.append(('回归脚本无跨行文取段正则(标题符后禁.*关键词)', False, str(e)[:50]))
     r.append(('docs/ 自定义目录已移除', not os.path.exists(os.path.join(root, 'docs'))))
-    # 打包器不得硬编码入包白名单（细则层会持续增长，白名单必然漏包）
-    bp = os.path.join(root, 'scripts', 'build_package.py')
-    bps = open(bp, encoding='utf-8').read() if os.path.exists(bp) else ''
-    r.append(('打包器自动收集入包文件(无硬编码白名单)',
-              'INCLUDE_REFERENCES' not in bps and 'INCLUDE_SCRIPTS' not in bps
-              and 'def collect(' in bps))
-    r.append(('打包器覆盖 scripts/*.py 与 references/*.md|json',
-              all(x in bps for x in ("'*.py'", "'*.md'", "'*.json'"))))
+    # ③ 打包轨已废止（3.19.0）：不得有 dist/ 目录、打包器脚本、以及任何遗留 zip 产物。
+    #    用户确认不再向第三方技能平台上传，打包步骤整体下架；留着 dist/ 就是一份会腐烂的
+    #    "第二份交付物"（改了源却不重打＝内容与仓库漂移），这也是删除它的根本理由。
+    r.append(('dist/ 打包产物目录已删除(3.19.0 废止打包轨)',
+              not os.path.exists(os.path.join(root, 'dist'))))
+    r.append(('仓库内无遗留 zip 产物',
+              not [f for f in os.listdir(root) if f.endswith('.zip')]
+              and not glob.glob(os.path.join(root, 'examples', '*.zip'))))
     # ② GitHub 轨：治理文件保留且与当前版本同步
     gov = [f for f in ('README.md', 'CHANGELOG.md', 'CONTRIBUTING.md', 'LICENSE', '.gitignore')
            if not os.path.exists(os.path.join(root, f))]
@@ -1899,11 +1921,11 @@ def check_repo(root, ev):
     # ④ SKILL.md 体积（渐进式披露：主文件只做路由层，行数字节双封顶）
     n_lines = len(open(os.path.join(root, 'SKILL.md'), encoding='utf-8').read().splitlines())
     r.append(('SKILL.md 行数≤150(路由层)', n_lines <= 150, '%d行' % n_lines))
-    # ⑤ .gitignore：覆盖缓存/工作目录/打包产物
+    # ⑤ .gitignore：覆盖缓存/工作目录/遗留压缩包（3.19.0 起 dist/ 不再是忽略对象——该目录已不存在）
     gi_p = os.path.join(root, '.gitignore')
     gi = open(gi_p, encoding='utf-8').read() if os.path.exists(gi_p) else ''
-    r.append(('.gitignore 覆盖缓存/工作目录/dist',
-              '__pycache__/' in gi and '.workbuddy/' in gi and 'dist/' in gi))
+    r.append(('.gitignore 覆盖缓存/工作目录/遗留zip',
+              '__pycache__/' in gi and '.workbuddy/' in gi and '/*.zip' in gi))
     # ⑥ 现行文档不得引用 2.0.0 之前的旧章节号（现为 §0~§6）；CHANGELOG 属历史记录，回溯性引用合法，排除；
     #    回归项数随版本增长，硬编码必然过期 → 一律改为引用报告
     stale_sec, stale_num = [], []

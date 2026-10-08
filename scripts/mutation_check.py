@@ -27,7 +27,7 @@ import sys
 import subprocess
 import tempfile
 
-ENGINE_VERSION = '3.18.0'   # 与 SKILL.md frontmatter 同源，回归自动校验（第 9 处）
+ENGINE_VERSION = '3.19.0'   # 与 SKILL.md frontmatter 同源，回归自动校验（3.19.0 起版本位由九处减为八处）
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = sys.executable
@@ -38,7 +38,6 @@ SKILL = os.path.join(ROOT, 'SKILL.md')
 MD_JSON = os.path.join(ROOT, 'scripts', 'md_to_json.py')
 MD_DOCX = os.path.join(ROOT, 'scripts', 'md_to_docx.py')
 REG = os.path.join(ROOT, 'scripts', 'regression_check.py')
-BUILD = os.path.join(ROOT, 'scripts', 'build_package.py')
 SAMPLE = os.path.join(ROOT, 'examples', '好吃的水果_教学设计方案_3课时.md')
 JSON1 = os.path.join(ROOT, 'examples', '好吃的水果_结构化输出样例.json')
 JSON2 = os.path.join(ROOT, 'examples', '认识5_结构化输出样例.json')
@@ -46,7 +45,7 @@ JSON2 = os.path.join(ROOT, 'examples', '认识5_结构化输出样例.json')
 # 所有可能被变异写坏的文件，一律纳入备份/还原集
 CS = os.path.join(ROOT, 'references', 'curriculum-standards.md')
 
-FILES = [SKILL, MD_JSON, MD_DOCX, REG, BUILD, SAMPLE, JSON1, JSON2, CS]
+FILES = [SKILL, MD_JSON, MD_DOCX, REG, SAMPLE, JSON1, JSON2, CS]
 
 out = []
 
@@ -73,7 +72,7 @@ def rederive():
 
 
 def clear_cache():
-    for m in ('md_to_json', 'md_to_docx', 'regression_check', 'build_package'):
+    for m in ('md_to_json', 'md_to_docx', 'regression_check'):
         sys.modules.pop(m, None)
 
 
@@ -251,35 +250,16 @@ def main():
         '窗口外的要素被切走 → 内容完好却误报 FAIL（注释明令禁止却在用）',
         m6, 'Gate-A块含四要素'))
 
-    # ── M7 打包器体积校验（上传轨最后一道闸）────────────────────────
-    # 语义说明：这里验证的是"防护有效"——保留 ①b 校验、把主文件撑到越界，
-    # 打包器必须拒绝出包。首版写成"摘掉校验后期望拒绝"，语义正好写反了。
+    # ── M7 主文件撑到体积越界（12KB 硬闸的最后一道防线）──────────────
+    # 3.19.0 废止打包轨前，这条由"打包器拒绝出包"兜底；打包器删除后，兜底职责
+    # 落到回归的**落盘字节**断言上。若它失效，细则会悄悄回流进路由层且无人报警——
+    # 故本用例不得随打包器一并删除，只是验证对象从打包器换成回归断言。
     def m7():
         write(SKILL, read(SKILL) + b'\n' + ('fill' * 800).encode('utf-8'))
-    ok7, d7 = False, ''
-    orig = {p: read(p) for p in FILES if os.path.exists(p)}
-    try:
-        m7()
-        assert len(read(SKILL)) > 12288, '未撑到越界'
-        r = subprocess.run([PY, BUILD], cwd=ROOT, capture_output=True)
-        rp = os.path.join(REPORT_DIR, 'build_package_report.txt')
-        txt = open(rp, encoding='utf-8', errors='replace').read() if os.path.exists(rp) else ''
-        blocked = (r.returncode != 0) or ('拒绝打包' in txt)
-        ok7 = blocked
-        d7 = ('捕获：打包器拒绝出包 —— ' + (txt.strip().splitlines()[0][:70] if txt.strip() else 'rc!=0')) \
-            if blocked else '未捕获：超限主文件照样打包成功'
-    except Exception as e:
-        d7 = '变异执行异常：%s' % str(e)[:90]
-    finally:
-        for p, b in orig.items():
-            if os.path.exists(p):
-                write(p, b)
-        clear_cache()
-    results.append(ok7)
-    log('  [%s] M7 打包器体积校验（超限主文件应被拒绝出包）' % ('捕获' if ok7 else '未捕获'))
-    log('        缺陷：上传轨此前只校验 frontmatter，体积越界照样产出 zip')
-    log('        结果：%s' % d7)
-    log()
+    results.append(run_case(
+        'M7 主文件膨胀到越界（3.19.0 起由回归体积断言兜底）',
+        '12KB 是渐进式披露硬闸；打包器删除后若这条断言也不灵，细则回流将毫无阻拦',
+        m7, 'SKILL.md 体积≤12KB'))
 
     # ===== 3.16.0 新增：课标错引（用户实测"备课美术"被引向普校＋聋校拼凑）=====
     # 变异强度核对：注入必须是**真替换**（不是追加），否则原文仍在、白名单与
