@@ -201,6 +201,12 @@ CURR_ALIAS = {
 # 课标中属于"篇章名"而非"内容领域"的头衔——它们不能充当锚点第一级
 CURR_NON_DOMAIN = ('课程总目标', '学段目标', '教学建议', '评价建议', '实施建议')
 
+# 3.23.0：契约（output-schema.json）中**按条件产出**的字段——守恒断言"声明即须产出"的豁免名单。
+# 现在为空：**任何字段要么恒被产出、要么从契约里删掉**，中间态（声明了却从不产出＝死字段）
+# 一律由断言拦下（第八种"虚假的绿"：契约与实现脱钩，两边都无人报警）。
+# 若将来确有条件字段，须在此登记并写明条件，禁止静默放宽。
+SCHEMA_OPTIONAL = set()
+
 
 def check(path):
     name = os.path.basename(path)
@@ -640,7 +646,9 @@ def check(path):
                   '' if not _pre else '预填%d行:%s' % (len(_pre), ','.join(_pre[:3]))))
     else:
         r.append(('LOS表起始列禁预填(起始以前测实测为准)', False, '未找到起始列表'))
-    r.append(('IEP 累计口径随表进附表', '累计口径' in appx_text))
+    # 3.23.0：交付稿统一写"累计办法"（"口径"属统计术语）；两种写法都认，
+    # 断言守的是"这条说明随表进了文末附表"这件事，不是某个词。
+    r.append(('IEP 累计办法随表进附表', bool(re.search(r'累计(口径|办法)', appx_text))))
     # 否定式：禁"附表N"第二套编号——两套体系会让"表号＝出现顺序"失效，教务核对必乱
     r.append(('表号单一体系(禁"附表N"第二套编号)',
               not re.search(r'\*\*附表\s*\d', text)
@@ -870,8 +878,12 @@ def check(path):
     #   映射""策略路由矩阵""写库前复查脱敏"等引擎工作流黑话照样堂而皇之落在教案里——
     #   教师读到"由引擎研判"立刻知道这份教案是机器写的，且这些词对他零信息量。
     # 口径：机制保留（如课时确认块），只换教师话术；本断言守住"黑话不进交付稿"。
+    # 3.23.0 补入：判据（引擎术语表里的"判据三段式"，教案写"达成标准/达成要求"）、
+    #   锚定单（引擎会话状态文件，教师手上没有这份东西）、漂移（"执行漂移"的内部说法）、
+    #   五列表（内部对教学过程表的称呼，交付稿按表名指称）。
     _BLACK_TERMS = ('引擎', '轻打扰', 'Gate-A', 'Gate-B', '代理映射', '策略路由矩阵',
-                    '写库', '沉淀件', '研判身份', '用户指定', '出口凭证', '双身份')
+                    '写库', '沉淀件', '研判身份', '用户指定', '出口凭证', '双身份',
+                    '判据', '锚定单', '漂移', '五列表')
     _hits = [k for k in _BLACK_TERMS if k in text]
     r.append(('交付稿禁引擎内部术语(教案本位)', not _hits,
               ','.join(_hits) if _hits else ''))
@@ -880,6 +892,14 @@ def check(path):
     sm = re.search(r'\|\s*学科\s*\|\s*([^|]+?)\s*\|', text)
     subj = sm.group(1).strip() if sm else ''
     r.append(('教案信息学科属培智10门课', subj in CURR_SUBJECTS, subj or '未填学科'))
+    # 3.23.0：交付稿内**班级名必须唯一**——认识5 的「待替换项与假设清单」里写着
+    # "前文"二（1）班"→一年级下册"，而该教案班级是**一（1）班**：另一份样例的班级名被
+    # 整句搬了过来（多模型接力/复制样例的典型污染）。教师拿到手会以为本教案用错班。
+    _cm = re.search(r'\|\s*班级\s*\|\s*([^|]+?)\s*\|', text)
+    _cn = re.match(r'^([一二三四五六七八九]（\d+）班)', _cm.group(1)) if _cm else None
+    if _cn:
+        _others = sorted(set(re.findall(r'[一二三四五六七八九]（\d+）班', text)) - {_cn.group(1)})
+        r.append(('交付稿班级名唯一(禁串入他班)', not _others, ','.join(_others)))
 
     # 书名白名单：正文出现的每部课标书名都须形如《培智学校义务教育{科目}课程标准（2016年版）》
     books = re.findall(r'《[^》]*?课程标准[^》]*?》', text)
@@ -1122,6 +1142,75 @@ def check_schema(root, ev=''):
         rr.append((tag + ' 探究流程与源稿逐字相等(禁截断)',
                    bool(_j_inq) and not _bad,
                    '' if not _bad else '不等%d/%d' % (len(_bad), len(_j_inq))))
+
+        # ===== 3.23.0 新增：契约 ↔ 派生实例 双向守恒（第八种"虚假的绿"）=====
+        # 背景：在 576 条断言全绿的状态下，`output-schema.json` 与派生器早已脱钩——
+        #   契约仍 required「研判身份」「用户指定」「确定方式(轻打扰直定/输出确认)」，
+        #   实现却产出「定案方式/定案说明」；另有 assessment 声明了却从不产出、
+        #   progression_rules 键名不一致（降级 vs 降级后观察）、探究活动「材料」minItems=1
+        #   却恒定为空、起始LOS enum 缺"待回填"等 8 处。
+        # 病根：check_schema 只校验契约文件的**片段结构**（step enum／感官 enum／anchors
+        #   required…），**从不把契约与派生实例对账**——契约写错、实现改了，两边都无人报警。
+        # ⇒ 守恒优于枚举：把 schema 树与实例树逐层对账，两个方向都验（代码→契约、契约→代码）。
+        _acc = {'miss': [], 'extra': [], 'dead': [], 'enum': []}
+
+        def _walk(snode, jnode, path):
+            if not isinstance(snode, dict) or 'properties' not in snode:
+                return
+            props = snode.get('properties', {})
+            jk = set(jnode.keys()) if isinstance(jnode, dict) else set()
+            for k in snode.get('required', []):
+                if k not in jk:
+                    _acc['miss'].append('%s.%s' % (path, k))
+            for k in sorted(jk):
+                if k not in props:
+                    _acc['extra'].append('%s.%s' % (path, k))
+            for k in props:
+                if k not in jk and k not in SCHEMA_OPTIONAL:
+                    _acc['dead'].append('%s.%s' % (path, k))
+            for k, v in props.items():
+                if not isinstance(v, dict) or not isinstance(jnode, dict):
+                    continue
+                if 'enum' in v and k in jnode:
+                    _vals = jnode[k] if isinstance(jnode[k], list) else [jnode[k]]
+                    for _x in _vals:
+                        if _x not in v['enum']:
+                            _acc['enum'].append('%s.%s=%s' % (path, k, _x))
+                jv = jnode.get(k)
+                if v.get('type') == 'array' and isinstance(jv, list) and jv:
+                    _walk(v.get('items', {}), jv[0], '%s.%s[0]' % (path, k))
+                elif v.get('type') == 'object' and isinstance(jv, dict):
+                    _walk(v, jv, '%s.%s' % (path, k))
+
+        _walk(schema, data, 'root')
+        rr.append((tag + ' 契约required实例无缺失(契约→代码)', not _acc['miss'],
+                   ';'.join(_acc['miss'][:4])))
+        rr.append((tag + ' 实例字段契约已声明(代码→契约)', not _acc['extra'],
+                   ';'.join(_acc['extra'][:4])))
+        rr.append((tag + ' 契约无死字段(声明即须产出)', not _acc['dead'],
+                   ';'.join(_acc['dead'][:4])))
+        rr.append((tag + ' 实例取值合契约enum', not _acc['enum'],
+                   ';'.join(_acc['enum'][:4])))
+
+        # ===== 3.23.0 新增：派生值不得是占位符（假值比缺字段更危险）=====
+        # 「见支持策略列·A」这类占位符让契约要求的内容形同虚设：下游拿到字段却什么也做不了，
+        # 且无从分辨"真信息"与"兜底文案"。派生不出来就留空报警，禁止用假值充数。
+        _inqs = [q for ls in lessons for q in ls.get('inquiry_activities', [])]
+        rr.append((tag + ' 探究活动名称非空(禁占位符)',
+                   bool(_inqs) and all(q.get('名称') and q['名称'] != '探究活动' for q in _inqs),
+                   ';'.join(q.get('名称', '') for q in _inqs if not q.get('名称'))))
+        _vers = [(q.get('名称', '?'), k) for q in _inqs for k in ('A', 'B', 'C')
+                 if not q.get('版本', {}).get(k) or '见支持策略列' in q['版本'].get(k, '')]
+        rr.append((tag + ' 探究活动版本A/B/C为真值(禁占位符)', not _vers,
+                   ';'.join('%s·%s' % v for v in _vers[:4])))
+        _ass = [(ls['课时序号'], k) for ls in lessons
+                for k in ('前测方式', '后测方式', '评价说明')
+                if not ls.get('assessment', {}).get(k)]
+        rr.append((tag + ' 每课时评价设计三字段非空', not _ass,
+                   ';'.join('课时%s缺%s' % a for a in _ass[:4])))
+        rr.append((tag + ' 家长配合非硬编码占位符',
+                   all('家校沟通渠道另行通知' != ls['分层作业'].get('家长配合', '')
+                       for ls in lessons)))
 
         los_ok, code_ok = True, True
         for row in data['los_table']:

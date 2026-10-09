@@ -16,7 +16,7 @@ import sys
 import glob
 import tempfile
 
-ENGINE_VERSION = '3.22.0'
+ENGINE_VERSION = '3.23.0'
 
 REPORT_DIR = os.path.join(tempfile.gettempdir(), 'peizhi_shuangmai')
 
@@ -173,6 +173,21 @@ def split_criterion(cell):
     return goal or cell, crit or '（目标描述内含判定条件）'
 
 
+def parse_abc_versions(s):
+    """从五列表「支持策略」列按 A／B／C 切出各层做法。
+
+    3.23.0：原写死成 `{'A': '见支持策略列·A', ...}`——**占位符冒充派生值**：契约要求「版本」
+    给出各层可操作版本，实现却只回一句"见某某列"，真实内容被丢在 JSON 之外（下游拿到这个
+    字段什么也做不了）。现在真切；切不出时留空，由断言报警，不再用假值充数。
+    """
+    out = {}
+    for m in re.finditer(r'([ABC])\s*[（(]([^）)]*)[）)]\s*([^；;]+)', s or ''):
+        out.setdefault(m.group(1), '%s（%s）%s' % (m.group(1), m.group(2), m.group(3).strip()))
+    for k in ('A', 'B', 'C'):
+        out.setdefault(k, '')
+    return out
+
+
 def derive(text):
     secs = split_sections(text)
 
@@ -308,10 +323,13 @@ def derive(text):
                     minutes = int(re.search(r'·(\d+)′', r[0]).group(1)) if re.search(r'·(\d+)′', r[0]) else 0
                     versions = r[3] if len(r) > 3 else ''
                     inq.append({
-                        '名称': mi.group(1) if mi else '探究活动',
+                        # 3.23.0：原 fallback 写死 '探究活动'——**占位符冒充派生值**，且掩盖了
+                        # 源稿里"这一行探究活动没写名称"的真实缺陷（4 个活动里 1 个无名，
+                        # 教师照着做时无从称呼）。改为留空，由断言报警。
+                        '名称': mi.group(1) if mi else '',
                         '步别': 'P参',
                         '分钟': minutes,
-                        '版本': {'A': '见支持策略列·A', 'B': '见支持策略列·B', 'C': '见支持策略列·C'},
+                        '版本': parse_abc_versions(versions),
                         '材料': [],
                         # 3.15.0：去掉 [:120] 固定窗口截断——探究流程是教师照着做的步骤，
                         # 截断后 JSON 侧永远缺尾巴，且这种"悄悄切一刀"正是本项目反复
@@ -416,6 +434,13 @@ def derive(text):
                     _i = lesson_idx(mm.group(1))
                     if _i:
                         homework.setdefault(_i, {})[mm.group(2)] = r[1]
+                        # 3.23.0：家长配合原为硬编码常量"家校沟通渠道另行通知"——源稿里根本
+                        # 没有这句话，是派生器编的（契约声明的字段拿到假值，比缺字段更危险：
+                        # 下游无从分辨它是真信息还是兜底文案）。改为从作业格内括号项提取。
+                        for _p in re.findall(r'[（(](家长[^）)]*)[）)]', r[1]):
+                            homework[_i].setdefault('家长配合', [])
+                            if _p not in homework[_i]['家长配合']:
+                                homework[_i]['家长配合'].append(_p)
                 elif len(r) >= 2 and r[0] in ('A', 'B', 'C'):
                     pass
 
@@ -505,8 +530,10 @@ def derive(text):
             break
     if ie_sec:
         for l in ie_sec[2]:
-            if '累计口径' in l:
-                iep_note = l.strip().lstrip('> ').replace('累计口径：', '').strip()
+            # 3.23.0：交付稿把这行说明由"累计口径"改为教师话"累计办法"（"口径"是统计术语，
+            # 教案里说"办法"更自然）。派生侧两种写法都认，避免措辞一改就静默丢字段。
+            if re.search(r'累计(口径|办法)', l):
+                iep_note = re.sub(r'^>\s*累计(口径|办法)：', '', l.strip()).strip()
         for header, rows in table_blocks(ie_sec[2]):
             if not header or '年度长期目标' not in ''.join(header):
                 continue
@@ -591,6 +618,30 @@ def derive(text):
             elif s.startswith('题面：'):
                 home_note['题面'] = s.split('：', 1)[1].strip()
 
+    # ---- 评价设计（3.23.0：契约声明了 lessons[].assessment，派生器此前**整节未读**——
+    #   「评价设计」节是"前后测对齐同一批目标格"的唯一落点，丢它＝ JSON 侧永远看不到评价
+    #   口径，而契约却又声明这个字段（第八种"虚假的绿"：契约与实现脱钩，576 条断言全绿）。
+    assessment = {}
+    as_sec = find_sec(secs, '评价设计')
+    if as_sec:
+        for l in as_sec[2]:
+            m = re.match(r'^\s*(第\s*[0-9０-９一二三四五六七八九十]{1,3}\s*课时)\s*[：:]\s*(.+)$', l)
+            if not m:
+                continue
+            _i = lesson_idx(m.group(1))
+            if not _i:
+                continue
+            body = m.group(2).strip()
+            if '后测' in body:
+                pre, post = body.split('后测', 1)
+                pre = pre.strip('；， ')
+                if pre.startswith('前测'):
+                    pre = pre[2:].strip()
+                post = ('后测' + post).strip('；， ')
+            else:
+                pre, post = body, ''
+            assessment[_i] = {'前测方式': pre, '后测方式': post, '评价说明': body}
+
     # ---- 组装 lessons ----
     lessons = []
     for i in range(1, n + 1):
@@ -609,11 +660,12 @@ def derive(text):
             'inquiry_activities': inquiries.get(i, []),
             'board_layout': boards.get(i, ''),
             '重难点': keypoints.get(i, {}),
+            'assessment': assessment.get(i, {}),
             '分层作业': {
                 'A': hw.get('A', ''),
                 'B': hw.get('B', ''),
                 'C': hw.get('C', ''),
-                '家长配合': '家校沟通渠道另行通知',
+                '家长配合': '；'.join(hw.get('家长配合', [])) or '见「家长记录条」',
             },
         })
 

@@ -19,7 +19,7 @@
     "privacy"
   ],
   "properties": {
-    "schema_version": { "type": "string", "const": "3.22.0" },
+    "schema_version": { "type": "string", "const": "3.23.0" },
 
     "meta": {
       "type": "object",
@@ -37,10 +37,9 @@
         "课时研判": {
           "type": "object",
           "title": "课时量研判（3.1.0 起课时数由引擎研判）",
-          "description": "记录测算过程与确定方式，供教务溯源与跨会话复用。研判身份为「学科资深教学专家＋培智特级教师」双身份；测算式 N = ceil(基础时长 × 复现系数 × 分层系数 ÷ 有效利用时长)，有效利用时长＝单课时时长×0.75。",
-          "required": ["研判身份", "基础时长分钟", "复现系数", "分层系数", "有效利用时长分钟", "测算课时数", "学科校验锚", "研判课时数N", "确定方式", "研判依据"],
+          "description": "记录测算过程与定案说明，供教务溯源与跨会话复用。测算式 N = ceil(基础时长 × 复现系数 × 分层系数 ÷ 有效利用时长)，有效利用时长＝单课时时长×0.75。3.22.0 起交付稿禁引擎内部术语，故本对象不再含「研判身份」「用户指定」（纯过程信息，教师读不懂也不需要），「确定方式(轻打扰直定/输出确认)」改为「定案方式(直接确定/教师确认)＋定案说明」。",
+          "required": ["基础时长分钟", "复现系数", "分层系数", "有效利用时长分钟", "测算课时数", "学科校验锚", "研判课时数N", "定案方式", "定案说明", "研判依据"],
           "properties": {
-            "研判身份": { "type": "string" },
             "基础时长分钟": { "type": "integer", "minimum": 1 },
             "复现系数": { "type": "number", "minimum": 1.2, "maximum": 1.5 },
             "分层系数": { "type": "number", "minimum": 1.1, "maximum": 1.3 },
@@ -48,8 +47,8 @@
             "测算课时数": { "type": "number", "minimum": 1 },
             "学科校验锚": { "type": "string" },
             "研判课时数N": { "type": "integer", "minimum": 1, "maximum": 6 },
-            "用户指定": { "type": "string", "description": "无 / 用户指定值，及与研判是否一致" },
-            "确定方式": { "type": "string", "enum": ["轻打扰直定", "输出确认"] },
+            "定案方式": { "type": "string", "enum": ["直接确定", "教师确认"] },
+            "定案说明": { "type": "string", "description": "交付稿「定案说明」行原文，直接确定/提交教师确认后定为 N 课时" },
             "研判依据": { "type": "string" }
           }
         },
@@ -132,6 +131,10 @@
           "主题": { "type": "string" },
           "核心目标": { "type": "string" },
           "生活化落点": { "type": "string" },
+          "分钟合计校验": {
+            "type": "integer",
+            "description": "本课时时间轴分钟合计，须 == meta.单课时时长分钟（时长恒等铁律）"
+          },
 
           "timeline": {
             "type": "array",
@@ -147,11 +150,7 @@
                   "enum": ["B", "O", "P前", "P参", "P后", "S"]
                 },
                 "环节名": { "type": "string" },
-                "分钟": { "type": "integer", "minimum": 1 },
-                "分钟合计校验": {
-                  "type": "integer",
-                  "description": "由生成方回填的本课时分钟合计，须 == meta.单课时时长分钟"
-                }
+                "分钟": { "type": "integer", "minimum": 1 }
               }
             }
           },
@@ -171,8 +170,7 @@
                 },
                 "层": { "type": "string", "enum": ["A", "B", "C"] },
                 "目标": { "type": "string", "description": "可观察动作＋可测条件" },
-                "评测判据": { "type": "string" },
-                "对应IEP长目标": { "type": "string" }
+                "评测判据": { "type": "string" }
               }
             }
           },
@@ -183,11 +181,13 @@
             "minItems": 1,
             "items": {
               "type": "object",
-              "required": ["名称", "步别", "分钟", "版本", "材料"],
+              "required": ["名称", "步别", "分钟", "版本", "材料", "流程", "支持策略"],
               "properties": {
                 "名称": { "type": "string" },
                 "步别": { "type": "string", "enum": ["P参"] },
                 "分钟": { "type": "integer", "minimum": 1 },
+                "流程": { "type": "string", "description": "教师照做的探究步骤（原文），3.15.0 起禁固定窗口截断" },
+                "支持策略": { "type": "string", "description": "五列表「支持策略」列原文（分层做法的原始出处）" },
                 "版本": {
                   "type": "object",
                   "required": ["A", "B", "C"],
@@ -197,7 +197,11 @@
                     "C": { "type": "string" }
                   }
                 },
-                "材料": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+                "材料": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "探究活动专用材料；沿用本课材料清单时为空——材料清单是唯一正式来源，禁在活动格内重复列（3.23.0：原 minItems=1 与实现恒定产出空数组冲突）"
+                }
               }
             }
           },
@@ -205,19 +209,11 @@
           "assessment": {
             "type": "object",
             "title": "课时评价（前后测对齐同一批目标格）",
+            "description": "3.23.0：原声明的「对齐目标格」「参与性判据」从未有实现产出——前者与 objectives_matrix 重复（同一事实两处），后者与铁律「禁注视≥N秒」正面冲突且与重难点·突破策略的 N 条重复，故删除；改为可确定派生的三字段。",
             "properties": {
               "前测方式": { "type": "string" },
               "后测方式": { "type": "string" },
-              "对齐目标格": { "type": "array", "items": { "type": "string" } },
-              "参与性判据": {
-                "type": "object",
-                "description": "出现 N（无参与）学生时启用：注视时长/触碰次数/在场时长",
-                "properties": {
-                  "注视时长秒": { "type": "integer" },
-                  "触碰次数": { "type": "integer" },
-                  "在场时长分钟": { "type": "integer" }
-                }
-              }
+              "评价说明": { "type": "string", "description": "「评价设计」节该课时的原文" }
             }
           },
 
@@ -264,6 +260,10 @@
             "pattern": "^生\\d+$",
             "description": "红区零命名，一律代号"
           },
+          "备注": {
+            "type": "string",
+            "description": "「行为事件备注」列原文（课后回填；3.23.0：此前契约把它错放在 records 内，而实现落在生级）"
+          },
           "records": {
             "type": "array",
             "description": "长度须 == meta.课时数N，逐课时 {起始LOS, 达成LOS} 成对",
@@ -274,13 +274,13 @@
                 "课时": { "type": "integer", "minimum": 1 },
                 "起始LOS": {
                   "type": "string",
-                  "enum": ["I", "V", "G", "P", "F", "N"]
+                  "enum": ["I", "V", "G", "P", "F", "N", "待回填"],
+                  "description": "3.20.0 起起始档禁预填，空表恒为「待回填」，由 P前 前测当堂实测后填写"
                 },
                 "达成LOS": {
                   "type": "string",
                   "enum": ["I", "V", "G", "P", "F", "N", "待回填"]
-                },
-                "备注": { "type": "string", "description": "ABC 三格简录：前因→行为→后果" }
+                }
               }
             }
           }
@@ -344,11 +344,11 @@
         "progression_rules": {
           "type": "object",
           "title": "晋级/降级阈值",
-          "required": ["晋级", "降级", "无进展", "无参与", "危机"],
+          "required": ["晋级", "降级后观察", "无进展", "无参与", "危机"],
           "properties": {
             "晋级": { "type": "string", "description": "达成率≥80%且独立尝试成功率≥80%连续2课时→降一级支持" },
-            "降级": { "type": "string", "description": "降级后观察1课时，回落则回退一级" },
-            "无进展": { "type": "string", "description": "连续2课时LOS无晋级→回查路由矩阵、小步子步幅减半" },
+            "降级后观察": { "type": "string", "description": "降级后观察1课时，回落则回退一级" },
+            "无进展": { "type": "string", "description": "连续2课时LOS无晋级→按知识类型与学科特点重新选择教学主策略、小步子步幅减半（3.22.0 教师话术）" },
             "无参与": { "type": "string", "description": "N → 转环境调整＋优先参与目标，不计学业判据" },
             "危机": { "type": "string", "description": "自伤/攻击/长时间逃离 → 降刺激、冷静角、任务降级、移除围观" }
           }

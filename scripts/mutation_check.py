@@ -27,7 +27,7 @@ import sys
 import subprocess
 import tempfile
 
-ENGINE_VERSION = '3.22.0'   # 与 SKILL.md frontmatter 同源，回归自动校验（3.19.0 起版本位由九处减为八处）
+ENGINE_VERSION = '3.23.0'   # 与 SKILL.md frontmatter 同源，回归自动校验（3.19.0 起版本位由九处减为八处）
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = sys.executable
@@ -44,11 +44,12 @@ SAMPLE = os.path.join(ROOT, 'examples', '好吃的水果_教学设计方案_3课
 SAMPLE2 = os.path.join(ROOT, 'examples', '认识5_教学设计方案_2课时.md')
 JSON1 = os.path.join(ROOT, 'examples', '好吃的水果_结构化输出样例.json')
 JSON2 = os.path.join(ROOT, 'examples', '认识5_结构化输出样例.json')
+SCHEMA = os.path.join(ROOT, 'references', 'output-schema.json')
 
 # 所有可能被变异写坏的文件，一律纳入备份/还原集
 CS = os.path.join(ROOT, 'references', 'curriculum-standards.md')
 
-FILES = [SKILL, MD_JSON, MD_DOCX, REG, SAMPLE, SAMPLE2, JSON1, JSON2, CS]
+FILES = [SKILL, MD_JSON, MD_DOCX, REG, SAMPLE, SAMPLE2, JSON1, JSON2, CS, SCHEMA]
 
 out = []
 
@@ -517,6 +518,64 @@ def main():
         'M25 引擎内部术语回流交付稿（研判身份/轻打扰/Gate-A）',
         '黑话一进教案就等于告诉教师"这是机器写的"，且对他零信息量；禁黑话断言必须当场变红',
         m25, '交付稿禁引擎内部术语(教案本位)'))
+
+    # ── M26 契约文件退回旧字段（契约↔实例脱钩复发）────────────────────
+    # 3.23.0 实锤：576 条断言全绿时，schema 仍 required「研判身份」「用户指定」「确定方式」，
+    # 而派生器早已产出「定案方式/定案说明」——check_schema 只校验契约文件的片段结构，
+    # 从不把契约与实例对账。新增守恒断言后，本用例验证它确实在干活。
+    def m26():
+        t = read(SCHEMA).decode('utf-8')
+        assert '"定案方式", "定案说明", "研判依据"' in t, '未定位到课时研判 required'
+        write(SCHEMA, t.replace(
+            '"required": ["基础时长分钟", "复现系数", "分层系数", "有效利用时长分钟", '
+            '"测算课时数", "学科校验锚", "研判课时数N", "定案方式", "定案说明", "研判依据"]',
+            '"required": ["研判身份", "基础时长分钟", "复现系数", "分层系数", "有效利用时长分钟", '
+            '"测算课时数", "学科校验锚", "研判课时数N", "确定方式", "研判依据"]'
+        ).encode('utf-8'))
+    results.append(run_case(
+        'M26 契约退回旧字段（研判身份/确定方式）而实现已改',
+        '契约与实现脱钩时两边都无人报警——这是第八种"虚假的绿"；守恒断言必须当场变红',
+        m26, '契约required实例无缺失'))
+
+    # ── M27 探究活动版本退回占位符 ─────────────────────────────────
+    def m27():
+        t = read(MD_JSON).decode('utf-8')
+        assert "'版本': parse_abc_versions(versions)," in t, '未定位到版本派生'
+        write(MD_JSON, t.replace(
+            "'版本': parse_abc_versions(versions),",
+            "'版本': {'A': '见支持策略列·A', 'B': '见支持策略列·B', 'C': '见支持策略列·C'},"
+        ).encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M27 探究活动版本退回占位符（假值充数）',
+        '占位符让契约要求的内容形同虚设，且下游分不清真信息与兜底文案；禁占位符断言须拦截',
+        m27, '探究活动版本A/B/C为真值'))
+
+    # ── M28 评价设计整节停止派生 ───────────────────────────────────
+    def m28():
+        t = read(MD_JSON).decode('utf-8')
+        assert "'assessment': assessment.get(i, {})," in t, '未定位到评价设计派生'
+        write(MD_JSON, t.replace("'assessment': assessment.get(i, {}),",
+                                 "'assessment': {},").encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M28 评价设计整节停止派生（契约声明却零产出）',
+        '「评价设计」节是前后测对齐的唯一落点；丢了它 JSON 侧永远看不到评价口径且无报错',
+        m28, '每课时评价设计三字段非空'))
+
+    # ── M29 交付稿串入他班（跨样例污染）────────────────────────────
+    # 3.23.0 实锤：认识5 的「待替换项与假设清单」写着"前文"二（1）班""，而该教案班级是
+    # **一（1）班**——另一份样例的班级名被整句搬了过来。教师会以为本教案用错了班。
+    def m29():
+        t = read(SAMPLE2).decode('utf-8')
+        assert '学情沿用关系（沿用以往学情记录与日常观察，课前现场核对）' in t, '未定位到假设清单行'
+        write(SAMPLE2, t.replace(
+            '学情沿用关系（沿用以往学情记录与日常观察，课前现场核对）',
+            '学情沿用关系（前文“二（1）班”→一年级下册，沿用确认，现场核对）').encode('utf-8'))
+    results.append(run_case(
+        'M29 交付稿串入另一份样例的班级名',
+        '本班是几班就写几班；串进他班名会让教师以为教案用错班级，且这类污染肉眼极难发现',
+        m29, '交付稿班级名唯一'))
 
     total, caught = len(results), sum(1 for x in results if x)
     log('=' * 64)
