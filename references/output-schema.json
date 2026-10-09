@@ -19,7 +19,7 @@
     "privacy"
   ],
   "properties": {
-    "schema_version": { "type": "string", "const": "3.21.0" },
+    "schema_version": { "type": "string", "const": "3.22.0" },
 
     "meta": {
       "type": "object",

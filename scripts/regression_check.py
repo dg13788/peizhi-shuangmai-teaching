@@ -678,14 +678,15 @@ def check(path):
               bool(_tl) and bool(re.search(r'\d+\s*至\s*\d+\s*分钟', _tl))
               and bool(re.search(r'（?[BOPP前参后S][导入目标测验总结]*）?', _tl)) and 'LOS' in _tl,
               '' if _tl else '缺课时时间轴节'))
-    # ⑤ 支持调整阈值「无进展」项须回查策略路由矩阵（4×3）重新装配——
-    #   只回查本课时「支持策略」列是同一批做法的复查，换不出新装配。
+    # ⑤ 支持调整阈值「无进展」项须重新选择教学主策略（引擎话为"策略路由矩阵 4×3 重新装配"；
+    #    3.22.0 起交付稿一律用教师话术，故关键词随口径改写），只回查本课时「支持策略」列
+    #    是同一批做法的复查，换不出新思路。
     _card_sec = sec_body(text, '跨课时行为干预支持卡')
     _np = [rw for rw in _card_sec.split('\n')
            if rw.strip().startswith('|') and '无进展' in rw]
     if _np:
-        _ok_mx = any(k in _np[0] for k in ('策略路由矩阵', '4×3', '知识类型×学科属性'))
-        r.append(('阈值表无进展项回查策略路由矩阵(非只查支持策略列)', _ok_mx,
+        _ok_mx = any(k in _np[0] for k in ('重新选择教学主策略', '知识类型与学科特点'))
+        r.append(('阈值表无进展项重新选择教学主策略(非只查支持策略列)', _ok_mx,
                   '' if _ok_mx else '仅回查本课时支持策略列'))
     # ⑥ 分层系数三档定档（domain-core 课时量研判）：C 层占比 → 1.3／1.2／1.1，
     #    禁由研判者自取"中上限"这类档位表内不存在的值。
@@ -845,22 +846,35 @@ def check(path):
     r.append(('课时量研判章节存在', bool(mj)))
     if mj:
         jseg = mj.group(0)
-        jkeys = ['研判身份', '基础时长', '复现系数', '分层系数', '有效利用时长',
-                 '测算课时数', '学科校验锚', '研判课时数N', '用户指定', '确定方式', '研判依据']
+        # 3.22.0：研判表"研判身份／用户指定"两行与"确定方式(轻打扰直定/输出确认)"均为
+        #   引擎内部术语，教师读不懂也无用（教案只须交代课时从哪来、为何这样定），一律移出交付稿。
+        jkeys = ['基础时长', '复现系数', '分层系数', '有效利用时长',
+                 '测算课时数', '学科校验锚', '研判课时数N', '定案说明', '研判依据']
         miss_j = [k for k in jkeys if k not in jseg]
-        r.append(('课时研判表字段齐全(11项)', not miss_j, '缺' + ','.join(miss_j) if miss_j else ''))
-        r.append(('研判身份为双身份(学科专家＋特级教师)',
-                  '资深教学专家' in jseg and '特级教师' in jseg))
+        r.append(('课时研判表字段齐全(9项)', not miss_j, '缺' + ','.join(miss_j) if miss_j else ''))
         r.append(('研判表有表头行(项目/内容)',
                   bool([b for b in bs if b and cells(b[0]) and cells(b[0])[0] == '项目'])))
-        jhow = re.search(r'确定方式\s*\|\s*(轻打扰直定|输出确认)', jseg)
-        r.append(('确定方式属合法枚举(直定/确认)', bool(jhow), jhow.group(1) if jhow else ''))
+        jhow = re.search(r'定案说明\s*\|\s*([^|]+?)\s*\|', jseg)
+        r.append(('定案说明写明直接确定/教师确认',
+                  bool(jhow) and any(k in (jhow.group(1) if jhow else '')
+                                     for k in ('直接确定', '教师确认')),
+                  jhow.group(1)[:20] if jhow else '缺定案说明行'))
         jn = re.search(r'研判课时数N\s*\|\s*(\d+)', jseg)
         r.append(('研判课时数N == 文件名课时数N',
                   bool(jn) and int(jn.group(1)) == n_less,
                   '%s/%s' % (jn.group(1) if jn else '?', n_less)))
         r.append(('研判依据含三阶切分口径(感知→理解→表达/应用)',
                   '感知' in jseg and ('应用' in jseg or '泛化' in jseg)))
+    # ===== 3.22.0 新增：交付稿禁引擎内部术语（教案本位，成品是给教师/教务/家长看的文书）=====
+    # 背景：3.13.0 只禁了版本号一类元信息，正文里"引擎研判""轻打扰直定""Gate-A""学情代理
+    #   映射""策略路由矩阵""写库前复查脱敏"等引擎工作流黑话照样堂而皇之落在教案里——
+    #   教师读到"由引擎研判"立刻知道这份教案是机器写的，且这些词对他零信息量。
+    # 口径：机制保留（如课时确认块），只换教师话术；本断言守住"黑话不进交付稿"。
+    _BLACK_TERMS = ('引擎', '轻打扰', 'Gate-A', 'Gate-B', '代理映射', '策略路由矩阵',
+                    '写库', '沉淀件', '研判身份', '用户指定', '出口凭证', '双身份')
+    _hits = [k for k in _BLACK_TERMS if k in text]
+    r.append(('交付稿禁引擎内部术语(教案本位)', not _hits,
+              ','.join(_hits) if _hits else ''))
 
     # ===== 3.16.0 新增：课标引用口径（只验格式不验真伪＝第六种"虚假的绿"）=====
     sm = re.search(r'\|\s*学科\s*\|\s*([^|]+?)\s*\|', text)
@@ -1012,16 +1026,14 @@ def check_schema(root, ev=''):
 
         # ===== 3.1.0 新增：课时量研判（课时数由引擎研判，非默认 1 课时、非用户输入）=====
         jg = data.get('meta', {}).get('课时研判', {})
-        jk = ['研判身份', '基础时长分钟', '复现系数', '分层系数', '有效利用时长分钟',
-              '测算课时数', '学科校验锚', '研判课时数N', '确定方式', '研判依据']
+        jk = ['基础时长分钟', '复现系数', '分层系数', '有效利用时长分钟',
+              '测算课时数', '学科校验锚', '研判课时数N', '定案方式', '定案说明', '研判依据']
         miss_j = [k for k in jk if not jg.get(k)]
         rr.append((tag + ' JSON meta.课时研判 十项齐全', not miss_j, '缺' + ','.join(miss_j) if miss_j else ''))
-        rr.append((tag + ' 研判身份为双身份(学科专家＋特级教师)',
-                  '资深教学专家' in jg.get('研判身份', '') and '特级教师' in jg.get('研判身份', '')))
         rr.append((tag + ' JSON 研判课时数N == 课时数N', jg.get('研判课时数N') == n,
                   '%s/%s' % (jg.get('研判课时数N'), n)))
-        rr.append((tag + ' 确定方式属合法枚举(直定/确认)',
-                  jg.get('确定方式') in ('轻打扰直定', '输出确认'), str(jg.get('确定方式'))))
+        rr.append((tag + ' 定案方式属合法枚举(直接确定/教师确认)',
+                  jg.get('定案方式') in ('直接确定', '教师确认'), str(jg.get('定案方式'))))
         b, rc, lc, ef, calc = (jg.get('基础时长分钟'), jg.get('复现系数'), jg.get('分层系数'),
                                jg.get('有效利用时长分钟'), jg.get('测算课时数'))
         num_ok = all(isinstance(x, (int, float)) and x for x in (b, rc, lc, ef, calc))
@@ -1036,33 +1048,34 @@ def check_schema(root, ev=''):
             rr.append((tag + ' 有效利用时长 == 单课时时长×0.75(±1)', abs(ef - dur * 0.75) <= 1,
                       '%s vs %s' % (ef, dur * 0.75)))
             margin = (n - calc) / n
-            rr.append((tag + ' 双出口判定自洽(余量>10%且N≤3 ⇔ 轻打扰直定)',
-                      (margin > 0.10 and n <= 3) == (jg.get('确定方式') == '轻打扰直定'),
-                      '余量%.0f%% N=%d %s' % (margin * 100, n, jg.get('确定方式'))))
+            rr.append((tag + ' 双出口判定自洽(余量>10%且N≤3 ⇔ 直接确定)',
+                      (margin > 0.10 and n <= 3) == (jg.get('定案方式') == '直接确定'),
+                      '余量%.0f%% N=%d %s' % (margin * 100, n, jg.get('定案方式'))))
             # 3.14.0 出口凭证：判定不许只落在研判表里。示范件曾判定"输出确认（随 Gate-A
-            # 一并确认）"而成品零 Gate-A 落点——教的是一条"说要停等却径直跑完"的路径。
+            # 一并确认）"而成品零确认落点——教的是一条"说要停等却径直跑完"的路径。
+            # 3.22.0：块名与人话同步——交付稿称「课时数确认记录（教师确认）」，禁 Gate-A 字样。
             _md2 = open(md_path, encoding='utf-8').read() if md_path and os.path.exists(md_path) else ''
-            _has_gate = bool(re.search(r'^\*\*Gate-A 确认记录', _md2, re.M))
-            _conf = jg.get('确定方式') == '输出确认'
-            rr.append((tag + ' 输出确认出口⇒有Gate-A确认记录块',
+            _has_gate = bool(re.search(r'^\*\*课时数确认记录', _md2, re.M))
+            _conf = jg.get('定案方式') == '教师确认'
+            rr.append((tag + ' 教师确认出口⇒有课时数确认记录块',
                       _has_gate if _conf else True,
-                      '出口=%s Gate-A块=%s' % (jg.get('确定方式'), _has_gate)))
-            rr.append((tag + ' 轻打扰直定出口⇒无Gate-A块(防双出口混淆)',
+                      '定案=%s 确认块=%s' % (jg.get('定案方式'), _has_gate)))
+            rr.append((tag + ' 直接确定出口⇒无确认记录块(防双出口混淆)',
                       not _has_gate if not _conf else True,
-                      '出口=%s Gate-A块=%s' % (jg.get('确定方式'), _has_gate)))
+                      '定案=%s 确认块=%s' % (jg.get('定案方式'), _has_gate)))
             if _has_gate:
                 # 3.15.0：改按结构边界取块（原为固定 1200 字符窗口，见 para_block 注释）
-                _gb = para_block(_md2, 'Gate-A 确认记录')
-                rr.append((tag + ' Gate-A块含四要素(事项/备选/确认结果/结论)',
+                _gb = para_block(_md2, '课时数确认记录')
+                rr.append((tag + ' 课时确认记录块含四要素(事项/备选/确认结果/结论)',
                           all(k in _gb for k in ('确认事项', '备选项', '确认结果', '确认后结论'))))
-                rr.append((tag + ' Gate-A确认结果留占位符(待教师填)',
+                rr.append((tag + ' 课时确认结果留占位符(待教师填)',
                           '{{' in _gb and '}}' in _gb))
                 # 锚点必须限定到结构位置：全文 + "待替换项与假设清单" 的首现其实落在
-                # Gate-A 块正文里（那句"登录下方…"），用 split(…)[-1] 会切的文档中部——
+                # 确认记录块正文里（那句"登录下方…"），用 split(…)[-1] 会切的文档中部——
                 # 同名词被别处兜住是本项目反复复发的老病，一律走 sec_body 按节边界取。
                 _hb = sec_body(_md2, '待替换项与假设清单')
-                rr.append((tag + ' Gate-A与假设清单相互指引',
-                          bool(_hb) and 'Gate-A' in _hb,
+                rr.append((tag + ' 课时确认记录与假设清单相互指引',
+                          bool(_hb) and '课时数确认记录' in _hb,
                           '' if _hb else '未定位到假设清单节'))
         else:
             rr.append((tag + ' 测算式可复核(基础×复现×分层÷有效≈测算值)', False, '研判字段非数值'))

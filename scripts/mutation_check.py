@@ -27,7 +27,7 @@ import sys
 import subprocess
 import tempfile
 
-ENGINE_VERSION = '3.21.0'   # 与 SKILL.md frontmatter 同源，回归自动校验（3.19.0 起版本位由九处减为八处）
+ENGINE_VERSION = '3.22.0'   # 与 SKILL.md frontmatter 同源，回归自动校验（3.19.0 起版本位由九处减为八处）
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = sys.executable
@@ -236,12 +236,13 @@ def main():
         '丢的是气味过敏这类安全项；旧断言 set==五维 硬相等恰恰因此成立',
         m5, '感官'))
 
-    # ── M6 Gate-A 块取段回退固定窗口 ───────────────────────────────
+    # ── M6 课时确认记录块取段回退固定窗口 ───────────────────────────
+    # （3.22.0：块名由「Gate-A 确认记录」改为教师话「课时数确认记录」，机制不变）
     def m6():
         t = read(REG).decode('utf-8')
-        assert "_gb = para_block(_md2, 'Gate-A 确认记录')" in t
-        write(REG, t.replace("_gb = para_block(_md2, 'Gate-A 确认记录')",
-                             "_gb = _md2.split('Gate-A 确认记录', 1)[1][:1200]").encode('utf-8'))
+        assert "_gb = para_block(_md2, '课时数确认记录')" in t
+        write(REG, t.replace("_gb = para_block(_md2, '课时数确认记录')",
+                             "_gb = _md2.split('课时数确认记录', 1)[1][:1200]").encode('utf-8'))
         s = read(SAMPLE).decode('utf-8')
         i = s.index('- **确认事项**：')
         j = s.index('\n', i)
@@ -249,9 +250,9 @@ def main():
         pad = '（变异填充：' + '这段说明用于把后续要素挤出固定窗口之外。' * 90 + '）'
         write(SAMPLE, (s[:j] + pad + s[j:]).encode('utf-8'))
     results.append(run_case(
-        'M6 Gate-A 块取段回退固定 1200 字符窗口',
+        'M6 课时确认记录块取段回退固定 1200 字符窗口',
         '窗口外的要素被切走 → 内容完好却误报 FAIL（注释明令禁止却在用）',
-        m6, 'Gate-A块含四要素'))
+        m6, '课时确认记录块含四要素'))
 
     # ── M7 主文件撑到体积越界（12KB 硬闸的最后一道防线）──────────────
     # 3.19.0 废止打包轨前，这条由"打包器拒绝出包"兜底；打包器删除后，兜底职责
@@ -499,6 +500,23 @@ def main():
         'M24 教案信息表行回抄三级全文（3.21.0 前的重复写法）',
         '表内与正文各一份全文＝两份须人工同步的副本（与 3.18.0 课题列同病根）；简式口径下引号原文一进表内须当场变红',
         m24, '教案信息课标锚点禁抄录原文条目'))
+
+    # ── M25 引擎内部术语回流交付稿（3.22.0 教案本位）─────────────────
+    # 教案是给教师/教务/家长看的正式文书：教师读到"由引擎研判""轻打扰直定""Gate-A""学情
+    # 代理映射""写库前复查脱敏"既看不懂、也立刻知道这份教案是机器写的。
+    # 3.13.0 只禁了版本号一类元信息，正文黑话无人管 ⇒ 新增本用例守住新断言。
+    def m25():
+        t = read(SAMPLE).decode('utf-8')
+        assert '### 课时量研判\n' in t, '未定位到课时量研判标题'
+        write(SAMPLE, t.replace(
+            '### 课时量研判\n',
+            '### 课时量研判（引擎研判，非用户指定）\n\n| 项目 | 内容 |\n| --- | --- |\n'
+            '| 研判身份 | 生活语文资深教学专家 ＋ 培智学校特级教师 |\n\n| 确定方式 | 输出确认（随 Gate-A 一并确认） |\n'
+        ).encode('utf-8'))
+    results.append(run_case(
+        'M25 引擎内部术语回流交付稿（研判身份/轻打扰/Gate-A）',
+        '黑话一进教案就等于告诉教师"这是机器写的"，且对他零信息量；禁黑话断言必须当场变红',
+        m25, '交付稿禁引擎内部术语(教案本位)'))
 
     total, caught = len(results), sum(1 for x in results if x)
     log('=' * 64)

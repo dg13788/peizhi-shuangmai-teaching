@@ -16,7 +16,7 @@ import sys
 import glob
 import tempfile
 
-ENGINE_VERSION = '3.21.0'
+ENGINE_VERSION = '3.22.0'
 
 REPORT_DIR = os.path.join(tempfile.gettempdir(), 'peizhi_shuangmai')
 
@@ -194,6 +194,8 @@ def derive(text):
     n = int(n_m.group(1)) if n_m else 1
 
     # ---- 课时量研判（3.1.0 起：课时数由引擎研判，测算过程随产物留痕供教务溯源）----
+    # 3.22.0：交付稿禁引擎内部术语——「研判身份」「用户指定」「确定方式(轻打扰直定/输出确认)」
+    #   一律不进教案；定案方式改由「定案说明」行的人话判定（直接确定／教师确认）。
     judge = {}
     j_sec = find_sec(secs, '课时量研判')
     if j_sec:
@@ -218,8 +220,8 @@ def derive(text):
             if not calc and base and rep_c and lay_c and eff:
                 calc = round(base * rep_c * lay_c / eff, 2)   # 兜底：按测算式反算
             jn = jnum('研判课时数N', r'(\d+)', int) or n
+            _decide = jr.get('定案说明', '')
             judge = {
-                '研判身份': jr.get('研判身份', ''),
                 '基础时长分钟': base,
                 '复现系数': rep_c,
                 '分层系数': lay_c,
@@ -227,8 +229,8 @@ def derive(text):
                 '测算课时数': calc,
                 '学科校验锚': jr.get('学科校验锚', ''),
                 '研判课时数N': jn,
-                '用户指定': jr.get('用户指定', '无'),
-                '确定方式': '轻打扰直定' if '轻打扰' in jr.get('确定方式', '') else '输出确认',
+                '定案方式': '教师确认' if '教师确认' in _decide else '直接确定',
+                '定案说明': _decide,
                 '研判依据': jr.get('研判依据', ''),
             }
 
