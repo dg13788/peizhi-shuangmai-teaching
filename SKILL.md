@@ -1,7 +1,7 @@
 ---
 name: peizhi-shuangmai-teaching
 description: 面向培智学校（及同类个别化教学）各学科的备课与教学设计 Skill。触发词：备课 / 教案 / 教学设计 / IEP 个别化教育计划 / 上传教材照片备课 / 趣味化教学方案 / BOPPPS 教案。以「个别化×生活化」双脉为主干、BOPPPS 为组织骨架、趣味化参与式学习为核心，支持 1~N 课时单元课设计，产出可测、可 LOS 六级分层、可迁移到真实生活的教学方案，经内置脚本一键交付 Word 成品；内置红区隐私护栏、双 Gate 低打扰确认、六维感官调节前置、跨课时行为干预递进、IEP 长期目标累计追踪与 4×3 知识类型策略路由。
-version: 3.20.0
+version: 3.21.0
 display_name: 培智·双脉教学引擎（特教 IEP 备课 Skill）
 display_name_en: Peizhi Dual-Track Teaching Engine
 description_zh: "面向培智学校的 IEP 备课 Skill：以「个别化×生活化」双脉为主干、BOPPPS 为骨架，支持 1~N 课时单元设计，产出 LOS 六级分层可测方案，一键交付 Word 成品。"
@@ -13,7 +13,7 @@ metadata:
   tags: 培智,特教,IEP,个别化教育,教学设计,备课,分层教学,LOS,AAC,PBS,BOPPPS,趣味化教学
 ---
 
-# 培智 · 双脉教学引擎 V3.20.0
+# 培智 · 双脉教学引擎 V3.21.0
 
 > **三层渐进式披露**：本文件＝**路由层**（常驻，只讲"走哪步、守什么、去哪取"）；
 > `references/`＝**细则层**（进入某环节时读对应文件）；`scripts/`＝**执行层**（格式转换一律调脚本，禁手工）。
@@ -38,7 +38,7 @@ metadata:
 1. **红区零输入零输出** — 姓名/身份证/病历/人脸照片/家庭敏感结构一律零输入零输出，学生一律代号"生N"；附件先检测后识别，命中即停；护栏不因任何理由豁免。
 2. **学情禁编造** — 学情不足即 Gate-B 停等补齐，禁默认＋假设豁免、禁静默编造；沿用历史学情须标来源并注"课前现场核对"。
 3. **教材禁杜撰** — 匹配到"版本→册次→单元→课"；不确证标"未确证"入待替换项，禁幻觉书名/出版社/页码。
-4. **课标锚点三级＋禁错引** — 到"板块 · 条目 · 具体表述"，禁只写学段，三视图与「教案信息」节全留三级；**必引《培智学校义务教育{科目}课程标准（2016年版）》**，禁普校2022版／聋校／盲校课标，别名留对齐凭证，不确证标"待核对"。
+4. **课标锚点三级＋禁错引** — 到"板块 · 条目 · 具体表述"，禁只写学段；全文只落「课标锚点、教材分析与学情分析」节，教案信息表内只写"书名＋领域＋见该节"简式；**必引《培智学校义务教育{科目}课程标准（2016年版）》**，禁普校2022版／聋校／盲校，别名留对齐凭证，不确证标"待核对"。
 5. **时长恒等** — 默认 35′/课时；**每课时五列表分钟之和恒等于该课时时长**（逐课时独立校验，分钟取整）。
 
 **关键枚举（常驻）**：LOS 六级＝独立(I)→口头(V)→手势(G)→身体(P)→完全辅助(F)，**无参与(N)** 另计（转参与目标，不计学业判据）；分层＝A轻度/B中度/C重度；BOPPPS 六步＝B 导入/O 目标/P前 前测/P参 参与/P后 后测/S 总结（P参≥50% 且为最大环节）。判据统一三段式 `〔条件/支持〕＋动作＋〔次数或正确率〕`，禁"掌握/了解"等不可测词。
@@ -85,7 +85,7 @@ metadata:
 
 ## 6. 治理与交付（不在本文件展开）
 
-- **交付形态＝仓库本身（单轨）**：治理文件（README/CHANGELOG/CONTRIBUTING/LICENSE）与执行层同库同源，用时直接以仓库目录取用；**3.19.0 起不再打包技能上传 zip、不再产出 `dist/`**（此前"仓库轨＋第三方技能平台上传轨"的双轨制已废止——打包产物是另一份需与仓库同步的副本，忘了重打即内容与仓库漂移）。
+- **交付形态＝仓库本身（单轨）**：治理文件（README/CHANGELOG/CONTRIBUTING/LICENSE）与执行层同库同源，用时直接以仓库目录取用；**3.19.0 起不再打包技能上传 zip、不再产出 `dist/`**（打包产物是需与仓库同步的第二副本，已废止）。
 - **结构化契约**：机器可读产物合 `references/output-schema.json`；顶层必填 `schema_version / meta / anchors[] / lessons[] / los_table / support / generalization / safety_alternatives / sensory_regulation / iep_tracking / materials / privacy`（回归自动校验）；硬约束：逐课时分钟合计＝单课时时长、`len(lessons) == 课时数N`、支持卡六要素、`los_table[].records` 逐课时成对、代号合 `^生\d+$`、`privacy.red_zone_free = true`、**`研判课时数N == 课时数N`**。
 - **Single Source**：JSON 只可由 md 经 `scripts/md_to_json.py` 派生，docx 只可由 `scripts/md_to_docx.py` 生成；样本见 `examples/好吃的水果_结构化输出样例.json`。
 - **版本一致性（八处）**：frontmatter `version`／正文标题 `Vx.y.z`／`output-schema.json` 的 `schema_version` const／`md_to_json.py`、`md_to_docx.py`、`mutation_check.py` 的 `ENGINE_VERSION`／CHANGELOG 当前条目／README 标题与版本段——回归自动校验，脚本版本以 frontmatter 为唯一真源。
