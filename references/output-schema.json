@@ -19,7 +19,7 @@
     "privacy"
   ],
   "properties": {
-    "schema_version": { "type": "string", "const": "3.23.0" },
+    "schema_version": { "type": "string", "const": "3.24.0" },
 
     "meta": {
       "type": "object",
@@ -54,17 +54,6 @@
         },
         "课型": { "type": "string" },
         "教学方法": { "type": "string" },
-        "教材": {
-          "type": "object",
-          "required": ["版本", "册次", "单元", "课"],
-          "properties": {
-            "版本": { "type": "string" },
-            "册次": { "type": "string" },
-            "单元": { "type": "string" },
-            "课": { "type": "string" },
-            "确证状态": { "type": "string", "enum": ["已确证", "未确证"] }
-          }
-        },
         "教材分析": {
           "type": "object",
           "title": "教材分析五要素（3.8.0）",

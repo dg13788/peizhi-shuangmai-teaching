@@ -536,46 +536,49 @@ def check(path):
         r.append(('板书按课时分块(禁一板通用)', _nblk >= n_less,
                   '%d块/%d课时' % (_nblk, n_less)))
 
-    # 10 教案信息·课标锚点简式（3.21.0：表内书名＋一级领域＋指引；三级全文只落「课标锚点、
-    #    教材分析与学情分析」节）。3.17.0 曾要求表内写三级全文（正式信息源回并），但正文分析节
-    #    本就有同批锚点全文——表内再抄一遍＝同一事实两份须人工同步的副本（与 3.18.0 课题列同病根）。
+    # 10 教案信息（3.24.0 收口）：表内**只留八行基本项**，凡正文另有专节承载的一律不再进表——
+    #   课标锚点（→「课标锚点、教材分析与学情分析」节）、教材版本（→同节·教材分析「出处与定位」）、
+    #   课时定位（教学定位→教材分析「地位与作用」；课时数→「课堂时长」行）、教学重难点
+    #   （→「三维×三层目标矩阵」节）。四行都是同一事实的第二份副本（与 3.18.0 课题列同病根）。
     # ⚠ 原写法是 `text.split('教务归档视图')[1]`——取"关键词之后的全部文本"，属固定窗口的变体：
     #   节已删除时取到空串，该断言会静默消失而不是报错（第七种"虚假的绿"的雏形）。
     #   改为按结构取段取「教案信息」节，并以"节是否存在"本身作为断言。
     info_sec = sec_body(text, '教案信息')
     r.append(('教案信息节存在(唯一正式信息源)', bool(info_sec.strip()),
               '' if info_sec.strip() else '缺「教案信息」节'))
-    _arow = re.search(r'\|\s*课标锚点\s*\|\s*([^|]+?)\s*\|', info_sec)
-    _atext = _arow.group(1) if _arow else ''
-    r.append(('教案信息课标锚点简式(书名+领域+指引)',
-              bool(_atext) and _atext.count('·') >= 1 and '见「课标锚点' in _atext,
-              '须含书名·一级领域与「见「课标锚点…」指引' if _atext else '缺课标锚点行'))
-    # 禁抄录原文条目：带引号的具体表述不得抄回表内——防"全文回抄"式重复回流（M24 守此条）
-    r.append(('教案信息课标锚点禁抄录原文条目(3.21.0)',
-              bool(_atext) and not re.search(r'[“][^”]{6,}[”]', _atext),
-              '表内出现引号原文条目' if _atext else '缺课标锚点行'))
-    # 禁退化：只写学段或以"详见……节"代替本行（3.17.0 前教案头正是这种残缺写法）
-    # ⚠ 3.21.0 修正 alternation bug：原 `(低|中|高年级段|…)` 只能匹配"低/中/高年级段"单字
-    #   或三字"高年级段"，"低年级段"四字从未匹配上——该断言 3.17.0 起从未单独拦住过目标
-    #   写法，此前 M14 的捕获全被相邻"三级全文"断言兜住（第 8 例"被别处兜住"）。
-    r.append(('教案信息课标锚点禁只写学段/禁详见代替',
-              bool(_atext) and not re.search(r'^《[^》]+》\s*(?:(?:低|中|高)年级段|第[一二三]学段|水平[一二三])?\s*[（(]?\s*详见',
-                                             _atext)))
+    _gone = [k for k in ('课时定位', '教材版本', '课标锚点', '教学重难点')
+             if re.search(r'\|\s*%s\s*\|' % k, info_sec)]
+    r.append(('教案信息四行已清除(课时定位/教材版本/课标锚点/教学重难点)',
+              not _gone, '残留：' + '、'.join(_gone) if _gone else ''))
+    # 行序固定：删行后极易随手写回或插到任意位置（表格无结构约束），顺序本身即契约。
+    _rows = [x for x in re.findall(r'^\|\s*([^|]+?)\s*\|', info_sec, re.M)
+             if x not in ('项目', '内容') and not set(x) <= set('-: ')]
+    _want = ['课题', '学科', '课型', '教学方法', '课堂时长', '班级', '授课日期', '执教者']
+    r.append(('教案信息八行固定顺序(课题→学科→课型→教学方法→课堂时长→班级→授课日期→执教者)',
+              _rows == _want, '实际：' + '→'.join(_rows) if _rows != _want else ''))
+    # 课型禁含学科名：学科已在「学科」行，课型再写"生活数学新授课"＝同名词两处（教师读起来
+    # 还以为是两种分类维度）。判据取 CURR_SUBJECTS 全集，禁逐个手写。
+    _krow = re.search(r'\|\s*课型\s*\|\s*([^|]+?)\s*\|', info_sec)
+    _kval = _krow.group(1) if _krow else ''
+    _khit = [s for s in CURR_SUBJECTS if s and s in _kval]
+    r.append(('教案信息课型禁含学科名(与学科行重复)',
+              bool(_kval) and not _khit,
+              '课型含学科名：' + '、'.join(_khit) if _khit else ('' if _kval else '缺课型行')))
 
-    # 10b 课题／教材版本分工（3.18.0）：课题列只写《课题》本身，册次·单元·课次归入教材版本
-    # 背景：改前两列各写一遍"人教版培智《生活数学》一年级下册"，同一事实两处副本，
-    # 改一处漏一处且冲突时无从判断谁对（与 3.17.0 删归档视图同一病根：重复即同步成本）。
+    # 10b 课题只写《课题》本身（3.18.0）：册次·单元·课次归教材分析「出处与定位」，不在课题列带括号后缀
     _trow = re.search(r'\|\s*课题\s*\|\s*([^|]+?)\s*\|', info_sec)
     _tval = _trow.group(1) if _trow else ''
     _tbad = bool(_tval) and bool(re.search(r'》\s*[（(]', _tval) or '年级' in _tval)
     r.append(('教案信息课题列只写《课题》本身(禁带册次括号后缀)',
               bool(_tval) and not _tbad, _tval[:40] if _tbad else ''))
-    _brow = re.search(r'\|\s*教材版本\s*\|\s*([^|]+?)\s*\|', info_sec)
-    _bval = _brow.group(1) if _brow else ''
-    r.append(('教案信息教材版本含册次与单元课次',
-              bool(_bval) and bool(re.search(r'(上|下)册', _bval))
-              and bool(re.search(r'单元|第\s*\d+\s*课', _bval)),
-              _bval[:40] if _bval else '缺教材版本行'))
+    # 教材版本行删除后，版本→册次→单元→课的唯一落点是教材分析「出处与定位」——
+    #   断言随之从"表内教材版本行"迁到该行（防护随实现搬迁，不随实现消失）。
+    _src = re.search(r'\*\*出处与定位\*\*[：:]\s*(.+)', text)
+    _sv = _src.group(1) if _src else ''
+    r.append(('教材分析出处与定位含版本册次单元课次(原教材版本行)',
+              bool(_sv) and bool(re.search(r'(上|下)册', _sv))
+              and bool(re.search(r'单元|第\s*\d+\s*课', _sv)),
+              _sv[:40] if _sv else '缺「出处与定位」行'))
 
     # 11 表号连续
     nums = [int(x) for x in re.findall(r'\*\*表(\d+)', text)]
@@ -946,11 +949,13 @@ def check(path):
     elif subj:
         r.append(('学科名须对齐为培智正式科目', '对齐为' in text,
                   '%s→%s' % (subj, CURR_ALIAS.get(subj, '待人工确认'))))
-    if info_sec:
-        abook = [b for b in re.findall(r'《[^》]*?课程标准[^》]*?》', info_sec)]
-        r.append(('教案信息课标锚点写明合法书名',
+    # 3.24.0：教案信息删去「课标锚点」行后，书名的唯一落点是正文课标锚点节——断言随之迁走，
+    #   并以"节内必须有书名"取代"表内必须有书名"（否则删行＝书名静默消失，见本次实况）。
+    if asec:
+        abook = [b for b in re.findall(r'《[^》]*?课程标准[^》]*?》', asec)]
+        r.append(('课标锚点节写明合法书名(原教案信息锚点行)',
                   bool(abook) and not [b for b in abook if b in bad_book],
-                  ','.join(abook[:2])))
+                  ','.join(abook[:2]) if abook else '课标锚点节缺书名'))
 
     return name, r
 

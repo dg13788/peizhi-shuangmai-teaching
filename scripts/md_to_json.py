@@ -16,7 +16,7 @@ import sys
 import glob
 import tempfile
 
-ENGINE_VERSION = '3.23.0'
+ENGINE_VERSION = '3.24.0'
 
 REPORT_DIR = os.path.join(tempfile.gettempdir(), 'peizhi_shuangmai')
 
@@ -205,7 +205,9 @@ def derive(text):
     n_stu = len(re.findall(r'A组\d+人|B组\d+人|C组\d+人', cls))
     dur_m = re.search(r'每课时(\d+)分钟', meta_raw.get('课堂时长', ''))
     dur = int(dur_m.group(1)) if dur_m else 35
-    n_m = re.search(r'共(\d+)课时', meta_raw.get('课堂时长', '')) or re.search(r'共(\d+)课时', meta_raw.get('课时定位', ''))
+    # 3.24.0：教案信息表删去「课时定位」行（单元课次归教材分析、课时数在「课堂时长」行），
+    #   fallback 同步去除——留着等于承认"课时数可能藏在已删行里"，删行后它永远取不到值。
+    n_m = re.search(r'共(\d+)课时', meta_raw.get('课堂时长', ''))
     n = int(n_m.group(1)) if n_m else 1
 
     # ---- 课时量研判（3.1.0 起：课时数由引擎研判，测算过程随产物留痕供教务溯源）----
@@ -685,13 +687,10 @@ def derive(text):
             '教学方法': meta_raw.get('教学方法', ''),
             '教材分析': textbook,
             '学情分析': learner,
-            '教材': {
-                '版本': meta_raw.get('教材版本', textbook_note),
-                '册次': '',
-                '单元': meta_raw.get('课时定位', ''),
-                '课': title,
-                '确证状态': '未确证' if '未确证' in text else '未确证',
-            },
+            # 3.24.0：删除 `meta.教材`（版本/册次/单元/课/确证状态）——删「教材版本」行后它
+            #   只剩假值：版本回落空串、册次恒空、单元被塞进「课时定位」整句（语义错配）、
+            #   确证状态恒"未确证"（源稿写"已核证"却仍报未确证）。四项事实本就完整落在
+            #   `教材分析.出处与定位`（版本→册次→单元→课），再留一份＝须人工同步的第二副本。
         },
         'anchors': anchors,
         'lessons': lessons,
