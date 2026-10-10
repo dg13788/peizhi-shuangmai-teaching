@@ -27,7 +27,7 @@ import sys
 import subprocess
 import tempfile
 
-ENGINE_VERSION = '3.24.0'   # 与 SKILL.md frontmatter 同源，回归自动校验（3.19.0 起版本位由九处减为八处）
+ENGINE_VERSION = '3.25.0'   # 与 SKILL.md frontmatter 同源，回归自动校验（3.19.0 起版本位由九处减为八处）
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = sys.executable
@@ -599,6 +599,33 @@ def main():
         'M30 教案信息八行顺序被打乱（班级挪到课题之前）',
         '行序是契约：教务按"课题→学科→课型→…"固定顺序核对，插行就要重找一遍',
         m30, '教案信息八行固定顺序(课题→学科→课型→教学方法→课堂时长→班级→授课日期→执教者)'))
+
+    # ── M31 封面首行学段词退回"启智" ──────────────────────────────────────
+    # 3.25.0 前的真实状态：两份样例封面首行都是"启智·{学科}·教学设计方案"，整份教案
+    # 的第一个词就用错了教育类别——"启智"只见于个别机构自称校名，教育部口径是"培智学校"。
+    # 与 3.16.0 课标禁错引同一病根：对外可溯源的术语写错，等于宣称引用了另一套体系。
+    def m31():
+        t = read(SAMPLE).decode('utf-8')
+        assert '# 培智·' in t, '未定位到封面首行'
+        write(SAMPLE, t.replace('# 培智·', '# 启智·', 1).encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M31 封面首行学段词退回"启智"（3.25.0 前的真实误写）',
+        '封面首词是整份教案对外的第一个词；写成"启智"等于宣称另一套教育类别，教务与检查据此判读体系',
+        m31, '交付稿禁写"启智"(学段词统一为培智)'))
+
+    # ── M32 封面首行学科名不在培智 10 门之内 ──────────────────────────────
+    # 只验"首行含培智两字"是装饰性断言：学科名写"美术""语文"照样 PASS，而培智没有这两门。
+    def m32():
+        t = read(SAMPLE).decode('utf-8')
+        m = re.match(r'# 培智·(.+?)·教学设计方案', t)
+        assert m, '未定位到封面首行'
+        write(SAMPLE, t.replace(m.group(0), '# 培智·生活语文与阅读·教学设计方案', 1).encode('utf-8'))
+        rederive()
+    results.append(run_case(
+        'M32 封面首行学科名不在培智10门之内（自造学科名）',
+        '首行格式对但学科名自造，同样让检查者无法与课标体系对上；断言须验取值不只验格式',
+        m32, '封面学科属培智10门课'))
 
     total, caught = len(results), sum(1 for x in results if x)
     log('=' * 64)

@@ -232,6 +232,19 @@ def check(path):
     h1 = [i for i, l in enumerate(lines) if l.startswith('# ')]
     r.append(('封面两行标题相邻', len(h1) >= 2 and h1[1] == h1[0] + 1))
 
+    # 1b 封面首行学段词＝培智（3.25.0）
+    # 教育部口径是**培智学校**（教基二〔2016〕5 号），课标／教材／学生群体三类术语全部为"培智"；
+    # "启智"只出现在个别机构自称的校名里，不是学段或教育类别术语。封面首行是整份教案的第一个词，
+    # 写错等于对外宣称引用了另一套体系——与 3.16.0「课标禁错引」同一病根。
+    # ⚠ 必须验取值本身（首行里的学科须属培智 10 门），不只验"有培智两字"。
+    _cov = lines[h1[0]][2:].strip() if h1 else ''
+    _mc = re.match(r'^培智·(.+?)·教学设计方案$', _cov)
+    r.append(('封面首行=培智·{学科}·教学设计方案', bool(_mc), _cov[:40]))
+    r.append(('封面学科属培智10门课', bool(_mc) and _mc.group(1) in CURR_SUBJECTS,
+              _mc.group(1) if _mc else '缺封面首行'))
+    r.append(('交付稿禁写"启智"(学段词统一为培智)', '启智' not in text,
+              '出现%d次' % text.count('启智') if '启智' in text else ''))
+
     # 2 表格均有表头行（首行非分隔行）
     bs = blocks(lines)
     nohead = [b[0] for b in bs if len(b) >= 2 and is_sep(b[0])]
